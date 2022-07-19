@@ -1,24 +1,36 @@
 package com.tobias.spotifydownloader;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.zeroturnaround.zip.ZipUtil;
 
+import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
 import java.util.Random;
 
-@CrossOrigin(origins = "http://127.0.0.1:5500")
+@CrossOrigin(origins = {"http://127.0.0.1:5500", "https://tobixnator.ddns.net", "https://other.ddns.net"})
 @RestController
 public class Download {
+    @Autowired
+    private FileStorageService fileStorageService;
 
     // get API for download
     @GetMapping(value = "/download")
     // get song and outputFormat
-    public Song download(@RequestParam(value = "song", defaultValue = "") String song, @RequestParam(value = "outputFormat", defaultValue = "mp3") String outputFormat) {
+    public ResponseEntity<Resource> download(@RequestParam(value = "song", defaultValue = "") String song, @RequestParam(value = "outputFormat", defaultValue = "mp3") String outputFormat, @RequestParam(value = "lyrics", defaultValue = "musixmatch") String lyrics, HttpServletRequest request) {
         // length of the directory name
         int directoryLength = Config.getDirectoryLength();
         String directory = Config.getSaveDirectory();
@@ -31,12 +43,15 @@ public class Download {
             directory = directory + extendedPath;
 
         }
-        new File(directory).mkdirs();
+        File saveDirectory = new File(directory);
+        saveDirectory.mkdirs();
+        saveDirectory.setWritable(true);
 
         try {
-            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " " + song);
-            System.out.println(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " \"" + song + "\"");
+            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
+            System.out.println(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
 
+            /*
             new Thread(new Runnable() {
                 public void run() {
                     BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -50,14 +65,44 @@ public class Download {
                     }
                 }
             }).start();
+             */
 
             p.waitFor();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+        ZipUtil.pack(saveDirectory, new File(Config.getSaveDirectory() + extendedPath + ".zip"));
 
-        System.out.println();
-        return new Song(song, outputFormat, directory);
+        saveDirectory.delete();
+
+        // Load file as Resource
+        //Resource resource = fileStorageService.loadFileAsResource(Config.getSaveDirectory() + extendedPath + ".zip");
+        Path filePath = Path.of(Config.getSaveDirectory() + extendedPath + ".zip");
+        Resource resource = null;
+        try {
+            resource = new UrlResource(filePath.toUri());
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        // Try to determine file's content type
+        String contentType = null;
+        try {
+            contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+
+        // Fallback to the default content type if type could not be determined
+        if(contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
     }
 
     @GetMapping(value = "/hello")
