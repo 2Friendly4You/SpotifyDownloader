@@ -8,6 +8,7 @@ public class Config {
     private static String saveDirectory = "C:\\Users\\schueler\\Desktop\\Musik\\";
     private static int directoryLength = 20;
     private static String startCommand = "cmd.exe /c";
+    private static int downloads = 0;
 
     public static void loadConfig() throws IOException {
         FileInputStream propsInput = null;
@@ -44,5 +45,9 @@ public class Config {
 
     public static String getStartCommand(){
         return startCommand;
+    }
+
+    public static int getDownloads(){
+        return downloads;
     }
 }
