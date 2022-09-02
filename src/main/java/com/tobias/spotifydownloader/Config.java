@@ -1,5 +1,7 @@
 package com.tobias.spotifydownloader;
 
+import com.sun.security.auth.login.ConfigFile;
+
 import java.io.*;
 import java.util.Properties;
 
@@ -22,6 +24,7 @@ public class Config {
             saveDirectory = prop.getProperty("saveDirectory");
             directoryLength = Integer.parseInt(prop.getProperty("directoryLength"));
             startCommand = prop.getProperty("startCommand");
+            downloads = Integer.parseInt(prop.getProperty("downloads"));
         } else {
             configFile.createNewFile();
 
@@ -29,6 +32,7 @@ public class Config {
             props.setProperty("saveDirectory", saveDirectory);
             props.setProperty("directoryLength", String.valueOf(directoryLength));
             props.setProperty("startCommand", startCommand);
+            props.setProperty("downloads", String.valueOf(downloads));
             FileWriter writer = new FileWriter(configFile);
             props.store(writer, "host settings");
             writer.close();
@@ -49,5 +53,37 @@ public class Config {
 
     public static int getDownloads(){
         return downloads;
+    }
+
+    public static void setDownloads(int downloads) throws IOException {
+        FileInputStream propsInput = null;
+        Properties props = null;
+
+        Config.downloads = downloads;
+
+        propsInput = new FileInputStream(configFile);
+        props = new Properties();
+        props.load(propsInput);
+
+        props.setProperty("downloads", String.valueOf(downloads));
+        FileWriter writer = new FileWriter(configFile);
+        props.store(writer, "host settings");
+        writer.close();
+    }
+
+    public static void increaseDownloads() throws IOException {
+        FileInputStream propsInput = null;
+        Properties props = null;
+
+        Config.downloads = Config.downloads + 1;
+
+        propsInput = new FileInputStream(configFile);
+        props = new Properties();
+        props.load(propsInput);
+
+        props.setProperty("downloads", String.valueOf(downloads));
+        FileWriter writer = new FileWriter(configFile);
+        props.store(writer, "host settings");
+        writer.close();
     }
 }

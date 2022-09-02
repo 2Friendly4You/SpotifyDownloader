@@ -29,6 +29,13 @@ public class Download {
     @GetMapping(value = "/download")
     // get song and outputFormat
     public ResponseEntity<Resource> download(@RequestParam(value = "song", defaultValue = "") String song, @RequestParam(value = "outputFormat", defaultValue = "mp3") String outputFormat, @RequestParam(value = "lyrics", defaultValue = "musixmatch") String lyrics, HttpServletRequest request) {
+        // increase downloads in Config
+        try {
+            Config.increaseDownloads();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         // length of the directory name
         int directoryLength = Config.getDirectoryLength();
         String directory = Config.getSaveDirectory();
@@ -106,6 +113,11 @@ public class Download {
     @GetMapping(value = "/hello")
     public String sayHello(@RequestParam(value = "name", defaultValue = "World") String name) {
         return String.format("Hello %s!", name);
+    }
+
+    @GetMapping(value = "/downloads")
+    public String returnDownloads(){
+        return String.valueOf(Config.getDownloads());
     }
 
     public static String createDirectoryName(int length){
