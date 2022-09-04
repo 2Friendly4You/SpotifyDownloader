@@ -110,6 +110,64 @@ public class Download {
                 .body(resource);
     }
 
+    // get API for download
+    @GetMapping(value = "/downloadV2")
+    // get song and outputFormat
+    public String downloadV2(@RequestParam(value = "song", defaultValue = "") String song, @RequestParam(value = "outputFormat", defaultValue = "mp3") String outputFormat, @RequestParam(value = "lyrics", defaultValue = "musixmatch") String lyrics) {
+        // increase downloads in Config
+        try {
+            Config.increaseDownloads();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // length of the directory name
+        int directoryLength = Config.getDirectoryLength();
+        String directory = Config.getSaveDirectory();
+        String extendedPath = createDirectoryName(directoryLength);
+        directory = directory + extendedPath;
+
+        while(new File(directory).exists()){
+            directory = Config.getSaveDirectory();
+            extendedPath = createDirectoryName(directoryLength);
+            directory = directory + extendedPath;
+
+        }
+        File saveDirectory = new File(directory);
+        saveDirectory.mkdirs();
+        saveDirectory.setWritable(true);
+
+        try {
+            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
+            System.out.println(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
+
+            /*
+            new Thread(new Runnable() {
+                public void run() {
+                    BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                    String line = null;
+
+                    try {
+                        while ((line = input.readLine()) != null)
+                            System.out.println(line);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+             */
+
+            p.waitFor();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        ZipUtil.pack(saveDirectory, new File(Config.getSaveDirectory() + extendedPath + ".zip"));
+
+        saveDirectory.delete();
+
+        return extendedPath + ".zip";
+    }
+
     @GetMapping(value = "/hello")
     public String sayHello(@RequestParam(value = "name", defaultValue = "World") String name) {
         return String.format("Hello %s!", name);
