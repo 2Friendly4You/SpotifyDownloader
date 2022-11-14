@@ -1,6 +1,5 @@
 package com.tobias.spotifydownloader;
 
-import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -20,11 +19,27 @@ import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.util.Random;
 
-@CrossOrigin(origins = {"http://127.0.0.1:5500", "https://tobixnator.ddns.net", "https://other.ddns.net"})
+@CrossOrigin(origins = {"http://127.0.0.1:5500", "https://tobiasrick.de"})
 @RestController
 public class Download {
     @Autowired
     private FileStorageService fileStorageService;
+
+    public static String createDirectoryName(int length) {
+        String lower = "abcdefghijklmnopqrstuvwxyz";
+        String upper = lower.toUpperCase();
+        String numbers = "1234567890";
+        String all = lower + upper + numbers;
+
+        Random random = new Random();
+        StringBuilder builder = new StringBuilder();
+
+        for (int i = 0; i < length; i++) {
+            char character = all.toCharArray()[random.nextInt(all.length())];
+            builder.append(character);
+        }
+        return builder.toString();
+    }
 
     // get API for download
     @GetMapping(value = "/download")
@@ -43,7 +58,7 @@ public class Download {
         String extendedPath = createDirectoryName(directoryLength);
         directory = directory + extendedPath;
 
-        while(new File(directory).exists()){
+        while (new File(directory).exists()) {
             directory = Config.getSaveDirectory();
             extendedPath = createDirectoryName(directoryLength);
             directory = directory + extendedPath;
@@ -54,8 +69,8 @@ public class Download {
         saveDirectory.setWritable(true);
 
         try {
-            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
-            System.out.println(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
+            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory + " --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
+            System.out.println(Config.getStartCommand() + " spotdl --output " + directory + " --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
 
             /*
             new Thread(new Runnable() {
@@ -101,7 +116,7 @@ public class Download {
         }
 
         // Fallback to the default content type if type could not be determined
-        if(contentType == null) {
+        if (contentType == null) {
             contentType = "application/octet-stream";
         }
 
@@ -128,7 +143,7 @@ public class Download {
         String extendedPath = createDirectoryName(directoryLength);
         directory = directory + extendedPath;
 
-        while(new File(directory).exists()){
+        while (new File(directory).exists()) {
             directory = Config.getSaveDirectory();
             extendedPath = createDirectoryName(directoryLength);
             directory = directory + extendedPath;
@@ -139,8 +154,8 @@ public class Download {
         saveDirectory.setWritable(true);
 
         try {
-            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
-            System.out.println(Config.getStartCommand() + " spotdl --output " + directory +" --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
+            final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + directory + " --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
+            System.out.println(Config.getStartCommand() + " spotdl --output " + directory + " --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
 
             /*
             new Thread(new Runnable() {
@@ -164,11 +179,57 @@ public class Download {
         }
         ZipUtil.pack(saveDirectory, new File(Config.getSaveDirectory() + extendedPath + ".zip"));
 
-        for(File file : saveDirectory.listFiles()){
+        for (File file : saveDirectory.listFiles()) {
             file.delete();
         }
         saveDirectory.delete();
 
+        return extendedPath + ".zip";
+    }
+
+    // get API for download
+    @GetMapping(value = "/downloadV3")
+    // get song and outputFormat
+    public String downloadV3(@RequestParam(value = "song", defaultValue = "") String song, @RequestParam(value = "outputFormat", defaultValue = "mp3") String outputFormat, @RequestParam(value = "lyrics", defaultValue = "musixmatch") String lyrics) {
+        // increase downloads in Config
+        try {
+            Config.increaseDownloads();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // length of the directory name
+        int directoryLength = Config.getDirectoryLength();
+        String directory = Config.getSaveDirectory();
+        String extendedPath = createDirectoryName(directoryLength);
+        directory = directory + extendedPath;
+
+        while (new File(directory).exists()) {
+            directory = Config.getSaveDirectory();
+            extendedPath = createDirectoryName(directoryLength);
+            directory = directory + extendedPath;
+
+        }
+        File saveDirectory = new File(directory);
+        saveDirectory.mkdirs();
+        saveDirectory.setWritable(true);
+
+        String finalDirectory = directory;
+        String finalExtendedPath = extendedPath;
+        new Thread(() -> {
+            try {
+                final Process p = Runtime.getRuntime().exec(Config.getStartCommand() + " spotdl --output " + finalDirectory + " --output-format " + outputFormat + " --lyrics-provider " + lyrics + " " + song);
+                p.waitFor();
+                ZipUtil.pack(saveDirectory, new File(Config.getSaveDirectory() + finalExtendedPath + ".zip"));
+                for (File file : saveDirectory.listFiles()) {
+                    file.delete();
+                }
+                saveDirectory.delete();
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }).start();
+        System.out.println(Config.getStartCommand() + " spotdl --output " + finalDirectory + " --output-format " + outputFormat + " --lyrics-provider " + lyrics + " \"" + song + "\"");
         return extendedPath + ".zip";
     }
 
@@ -178,23 +239,7 @@ public class Download {
     }
 
     @GetMapping(value = "/downloads")
-    public String returnDownloads(){
+    public String returnDownloads() {
         return String.valueOf(Config.getDownloads());
-    }
-
-    public static String createDirectoryName(int length){
-        String lower = "abcdefghijklmnopqrstuvwxyz";
-        String upper = lower.toUpperCase();
-        String numbers = "1234567890";
-        String all = lower + upper + numbers;
-
-        Random random = new Random();
-        StringBuilder builder = new StringBuilder();
-
-        for (int i = 0; i < length; i++){
-            char character = all.toCharArray()[random.nextInt(all.length())];
-            builder.append(character);
-        }
-        return builder.toString();
     }
 }
