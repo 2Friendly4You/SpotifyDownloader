@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Downloader</title>
+    <!-- Include Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Music Downloader</h1>
+        <form id="search-form">
+            <div class="form-group">
+                <input type="text" class="form-control" id="search_query" placeholder="Enter a song or URL">
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <select class="form-control" id="audio_format">
+                        <option value="spotify">Spotify</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="youtube-music">YouTube Music</option>
+                        <option value="slider-kz">slider.kz</option>
+                        <option value="soundcloud">SoundCloud</option>
+                        <option value="bandcamp">Bandcamp</option>
+                        <option value="piped">Piped</option>
+                        <!-- Add other audio sources here -->
+                    </select>
+                </div>
+                <div class="form-group col-md-4">
+                    <select class="form-control" id="lyrics_format">
+                        <option value="musixmatch">musixmatch</option>
+                        <option value="genius">genius</option>
+                        <option value="azlyrics">azlyrics</option>
+                        <option value="synced">synced</option>
+                        <option value="">NONE</option>
+                        <!-- Add other output formats here -->
+                    </select>
+                </div>
+                <div class="form-group col-md-4">
+                    <select class="form-control" id="output_format">
+                        <option value="mp3">MP3</option>
+                        <option value="m4a">M4A</option>
+                        <option value="wav">WAV</option>
+                        <option value="flac">FLAC</option>
+                        <option value="ogg">OGG</option>
+                        <option value="opus">OPUS</option>
+                        <!-- Add other output formats here -->
+                    </select>
+                </div>
+                <div class="form-group col-md-4">
+                    <button type="button" class="btn btn-primary" id="download-button">Download</button>
+                </div>
+            </div>
+        </form>
+        <div class="mt-3">
+            <h2>Requests</h2>
+            <ul id="requests-list">
+                <!-- Requests will be added here dynamically -->
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            var requestElement; // Declare the requestElement variable in the outer scope
+            var checkInterval;  // Declare the interval variable in the outer scope
+
+            $("#download-button").click(function () {
+                var search_query = $("#search_query").val();
+                var audio_format = $("#audio_format").val();
+                var lyrics_format = $("#lyrics_format").val();
+                var output_format = $("#output_format").val();
+
+                // Create a new request list item
+                var requestId = Date.now().toString(); // Unique identifier for the request
+                var requestItem = '<li id="' + requestId + '"><span>' + search_query + ' (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>';
+                $("#requests-list").append(requestItem);
+
+                // Send the request to the server
+                $.post('/search', {
+                    search_query: search_query,
+                    audio_format: audio_format,
+                    lyrics_format: lyrics_format,
+                    output_format: output_format
+                }, function (data) {
+                    if (data.status === 'completed') {
+                        // If the response indicates that the song is already completed, add a download button
+                        requestElement = $('#' + requestId); // Assign requestElement in the outer scope
+                        requestElement.find('span').text(search_query + ' (' + data.status + ')');
+                        var downloadButton = '<a class="btn btn-success" href="/download/' + data.unique_id + '">Download</a>';
+                        requestElement.append(downloadButton);
+                        clearInterval(checkInterval); // Clear the interval
+                    } else {
+                        // Function to periodically check the status
+                        function checkStatus(uuid, unique_id) {
+                            var requestElement = $('#' + uuid);
+                            var downloadButtonExists = requestElement.find('.btn-success').length > 0;
+
+                            if (downloadButtonExists) {
+                                requestElement.find('.spinner-border').remove(); // Remove the loading animation
+                                clearInterval(checkInterval); // Clear the interval
+                            } else {
+                                $.get('/status/' + unique_id, function (data) {
+                                    if (data.status === 'completed') {
+                                        // Update the request status
+                                        requestElement.find('span').text(search_query + ' (' + data.status + ')');
+
+                                        // Add a download button
+                                        var downloadButton = '<a class="btn btn-success" href="/download/' + unique_id + '">Download</a>';
+                                        requestElement.append(downloadButton);
+                                        requestElement.find('.spinner-border').remove(); // Remove the loading animation
+                                        clearInterval(checkInterval); // Clear the interval
+                                    }
+                                });
+                            }
+                        }
+
+                        // Start checking the status every 5 seconds
+                        checkInterval = setInterval(function () {
+                            checkStatus(requestId, data.unique_id); // Pass data.unique_id
+                        }, 5000);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
