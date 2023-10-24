@@ -68,8 +68,8 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function () {
-            var requestElement; // Declare the requestElement variable in the outer scope
-            var checkInterval;  // Declare the interval variable in the outer scope
+            var requestElements = {}; // Use an object to store request elements and intervals
+            var requestIdCounter = 0; // Counter for generating unique IDs
 
             $("#download-button").click(function () {
                 var search_query = $("#search_query").val();
@@ -78,7 +78,7 @@
                 var output_format = $("#output_format").val();
 
                 // Create a new request list item
-                var requestId = Date.now().toString(); // Unique identifier for the request
+                var requestId = 'request_' + (requestIdCounter++); // Unique identifier for the request
                 var requestItem = '<li id="' + requestId + '"><span>' + search_query + ' (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>';
                 $("#requests-list").append(requestItem);
 
@@ -91,11 +91,10 @@
                 }, function (data) {
                     if (data.status === 'completed') {
                         // If the response indicates that the song is already completed, add a download button
-                        requestElement = $('#' + requestId); // Assign requestElement in the outer scope
+                        var requestElement = $('#' + requestId);
                         requestElement.find('span').text(search_query + ' (' + data.status + ')');
                         var downloadButton = '<a class="btn btn-success" href="/download/' + data.unique_id + '">Download</a>';
                         requestElement.append(downloadButton);
-                        clearInterval(checkInterval); // Clear the interval
                     } else {
                         // Function to periodically check the status
                         function checkStatus(uuid, unique_id) {
@@ -104,7 +103,7 @@
 
                             if (downloadButtonExists) {
                                 requestElement.find('.spinner-border').remove(); // Remove the loading animation
-                                clearInterval(checkInterval); // Clear the interval
+                                clearInterval(requestElements[uuid]); // Clear the interval
                             } else {
                                 $.get('/status/' + unique_id, function (data) {
                                     if (data.status === 'completed') {
@@ -115,14 +114,14 @@
                                         var downloadButton = '<a class="btn btn-success" href="/download/' + unique_id + '">Download</a>';
                                         requestElement.append(downloadButton);
                                         requestElement.find('.spinner-border').remove(); // Remove the loading animation
-                                        clearInterval(checkInterval); // Clear the interval
+                                        clearInterval(requestElements[uuid]); // Clear the interval
                                     }
                                 });
                             }
                         }
 
                         // Start checking the status every 5 seconds
-                        checkInterval = setInterval(function () {
+                        requestElements[requestId] = setInterval(function () {
                             checkStatus(requestId, data.unique_id); // Pass data.unique_id
                         }, 5000);
                     }
