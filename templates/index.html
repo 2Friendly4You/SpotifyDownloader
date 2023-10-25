@@ -4,10 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Downloader</title>
+    <meta name="description" content="Spotify Downloader">
+	<meta property="og:site_name" content="Spotify Downloader">
+	<meta property="og:title" content="Spotify Downloader">
+	<meta property="og:description" content="Spotify Downloader">
+	<meta property="og:type" content="website" />
+    <title>Spotify Downloader</title>
     <!-- Include Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-8J4JDM8GTP"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag() { dataLayer.push(arguments); }
+		gtag('js', new Date());
+
+		gtag('config', 'G-8J4JDM8GTP');
+	</script>
 </head>
 
 <body>
@@ -97,7 +111,7 @@
                     if (data.status === 'completed') {
                         var requestElement = $('#' + requestId);
                         requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                        var downloadButton = '<a class="btn btn-success" href="/download/' + data.unique_id + '">Download</a>';
+                        var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + data.unique_id + '">Download</a>';
                         requestElement.append(downloadButton);
                     } else {
                         function checkStatus(uuid, unique_id) {
@@ -111,7 +125,7 @@
                                 $.get('/status/' + unique_id, function (data) {
                                     if (data.status === 'completed') {
                                         requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                                        var downloadButton = '<a class="btn btn-success" href="/download/' + unique_id + '">Download</a>';
+                                        var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + unique_id + '">Download</a>';
                                         requestElement.append(downloadButton);
                                         requestElement.find('.spinner-border').remove();
                                         clearInterval(requestElements[uuid]);
