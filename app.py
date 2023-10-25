@@ -23,10 +23,10 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     os.makedirs(download_folder, exist_ok=True)
 
     # Run spotdl with the provided parameters and unique folder
-    if audio_format == 'spotify':
-        command = f'spotdl --lyrics {lyrics_format} --format {output_format} --output "{download_folder}" "{search_query}"'
+    if not lyrics_format:
+        command = f'spotdl "{search_query}" --audio {audio_format} --format {output_format} --output "{download_folder}"'
     else:
-        command = f'spotdl --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}" "{search_query}"'
+        command = f'spotdl "{search_query}" --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
 
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
