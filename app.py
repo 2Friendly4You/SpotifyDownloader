@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import uuid
 import shutil
 import time
+import shutil
 
 app = Flask(__name__)
 
@@ -12,13 +13,12 @@ app = Flask(__name__)
 pending_requests = []
 
 def is_request_pending(unique_id):
+    global pending_requests
     return unique_id in pending_requests
 
-import os
-import subprocess
-import shutil
-
 def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
+    global pending_requests
+
     download_folder = os.path.join('templates', 'download', unique_id)
     os.makedirs(download_folder, exist_ok=True)
 
@@ -28,7 +28,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     else:
         command = f'spotdl "{search_query}" --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
 
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(command, shell=True, check=True, text=True)
 
     if result.returncode == 0:
         # Create a zip file with the contents of the folder
@@ -44,7 +44,6 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
         # Remove the UUID from the list when the download is complete
         pending_requests.remove(unique_id)
     else:
-        print(unique_id)
         pending_requests.remove(unique_id)
 
 @app.route('/')
@@ -88,11 +87,11 @@ def check_request(unique_id):
 @app.route('/download/<unique_id>', methods=['GET', 'POST'])
 def download(unique_id):
     download_file = os.path.join('templates', 'download', unique_id + ".zip")
-    print(download_file)
     if os.path.isfile(download_file):
         return send_file(download_file, as_attachment=True)
     else:
         return jsonify({'status': 'error', 'message': 'File not found'})
         
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
+ 
