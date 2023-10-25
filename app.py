@@ -58,6 +58,10 @@ def search():
     lyrics_format = request.form['lyrics_format']
     output_format = request.form['output_format']
 
+    ## Check if the search query is empty
+    if not search_query:
+        return jsonify({'status': 'error', 'message': 'Search query is required'})
+
     # Generate a new unique ID
     while True:
         unique_id = str(uuid.uuid4())
