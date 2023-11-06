@@ -24,8 +24,10 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
         command = f'spotdl "{search_query}" --audio {audio_format} --format {output_format} --output "{download_folder}"'
     else:
         command = f'spotdl "{search_query}" --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
-
-    result = subprocess.run(command, shell=True, check=True, text=True)
+    try:
+        result = subprocess.run(command, shell=True, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        result = e
 
     if result.returncode == 0:
         # Create a zip file with the contents of the folder
@@ -34,6 +36,11 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
         except FileNotFoundError as e:
             time.sleep(1)
             shutil.make_archive(download_folder, 'zip', download_folder)
+    else:
+        # Create an empty zip file
+        with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
+            error_file.write("Error downloading song")
+        shutil.make_archive(download_folder, 'zip', download_folder)
 
     # Remove the original folder
     shutil.rmtree(download_folder)
