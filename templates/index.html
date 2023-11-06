@@ -150,16 +150,22 @@
             $("#search-form").submit(function (event) {
                 event.preventDefault();
                 initiateDownload();
+                // clear input
+                $("#search_query").val('');
             });
 
             $("#download-button").click(function () {
                 initiateDownload();
+                // clear input
+                $("#search_query").val('');
             });
 
             $("#search_query").keypress(function (e) {
                 if (e.which === 13) {
                     e.preventDefault();
                     initiateDownload();
+                    // clear input
+                    $("#search_query").val('');
                 }
             });
         });
