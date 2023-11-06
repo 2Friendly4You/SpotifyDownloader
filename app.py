@@ -90,9 +90,19 @@ def check_request(unique_id):
 def download(unique_id):
     download_file = os.path.join('templates', 'download', unique_id + ".zip")
     if os.path.isfile(download_file):
+        # create thread that deletes the file after 1 hour with exception handling
+        thread = threading.Thread(target=delete_file, args=(download_file,))
+        thread.start()
         return send_file(download_file, as_attachment=True)
     else:
         return jsonify({'status': 'error', 'message': 'File not found'})
+
+def delete_file(download_file):
+    try:
+        time.sleep(3600)
+        os.remove(download_file)
+    except:
+        pass
 
 def get_pending_requests():
     try:
