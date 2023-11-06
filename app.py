@@ -5,12 +5,39 @@ from flask import Flask, render_template, request, jsonify, send_file
 import uuid
 import shutil
 import time
-import shutil
 
 app = Flask(__name__)
 
 # A list to store pending request UUIDs
 pending_requests = []
+
+def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
+    global pending_requests
+
+    download_folder = os.path.join('templates', 'download', unique_id)
+    os.makedirs(download_folder, exist_ok=True)
+
+    # Run spotdl with the provided parameters and unique folder
+    if not lyrics_format:
+        command = f'spotdl "{search_query}" --audio {audio_format} --format {output_format} --output "{download_folder}"'
+    else:
+        command = f'spotdl "{search_query}" --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
+
+    result = subprocess.run(command, shell=True, check=True, text=True)
+
+    if result.returncode == 0:
+        # Create a zip file with the contents of the folder
+        try:
+            shutil.make_archive(download_folder, 'zip', download_folder)
+        except FileNotFoundError as e:
+            time.sleep(1)
+            shutil.make_archive(download_folder, 'zip', download_folder)
+
+    # Remove the original folder
+    shutil.rmtree(download_folder)
+
+    # Remove the unique_id from the pending_requests list after the subprocess command has finished executing
+    pending_requests.remove(unique_id)
 
 def is_request_pending(unique_id):
     global pending_requests
@@ -38,13 +65,9 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             time.sleep(1)
             shutil.make_archive(download_folder, 'zip', download_folder)
 
-        # Remove the original folder
-        shutil.rmtree(download_folder)
-
-        # Remove the UUID from the list when the download is complete
-        pending_requests.remove(unique_id)
-    else:
-        pending_requests.remove(unique_id)
+    # Remove the original folder
+    shutil.rmtree(download_folder)
+    pending_requests.remove(unique_id)
 
 @app.route('/')
 def index():
