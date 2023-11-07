@@ -4,24 +4,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Spotify Downloader">
-	<meta property="og:site_name" content="Spotify Downloader">
-	<meta property="og:title" content="Spotify Downloader">
-	<meta property="og:description" content="Spotify Downloader">
-	<meta property="og:type" content="website" />
+
+    <meta name="description" content="Spotify downloader for downloading Spotify songs via a link">
+    <meta name="msapplication-TileImage" content="https://tobiasrick.de/SpotifyDownloader.png">
+    <meta property="og:site_name" content="Spotify Downloader">
+    <meta property="og:title" content="Spotify Downloader">
+    <meta property="og:description" content="Spotify downloader for downloading Spotify songs via a link">
+    <meta property="og:image" itemprop="image" content="https://tobiasrick.de/SpotifyDownloader.png">
+    <meta property="og:type" content="website" />
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="300">
+    <meta property="og:image:height" content="300">
+    <meta property="og:url" content="https://sd.codemagie.xyz/">
+    <link rel="icon" href="https://tobiasrick.de/SpotifyDownloader.png" type="image/png">
+
     <title>Spotify Downloader</title>
     <!-- Include Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <!-- Google tag (gtag.js) -->
-	<script async src="https://www.googletagmanager.com/gtag/js?id=G-8J4JDM8GTP"></script>
-	<script>
-		window.dataLayer = window.dataLayer || [];
-		function gtag() { dataLayer.push(arguments); }
-		gtag('js', new Date());
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8J4JDM8GTP"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
 
-		gtag('config', 'G-8J4JDM8GTP');
-	</script>
+        gtag('config', 'G-8J4JDM8GTP');
+    </script>
+
+    <script>
+        !function (Gleap, t, i) {
+            if (!(Gleap = window.Gleap = window.Gleap || []).invoked) {
+                for (window.GleapActions = [], Gleap.invoked = !0, Gleap.methods = ["identify", "setEnvironment", "setTags", "attachCustomData", "setCustomData", "removeCustomData", "clearCustomData", "registerCustomAction", "trackEvent", "log", "preFillForm", "showSurvey", "sendSilentCrashReport", "startFeedbackFlow", "startBot", "setAppBuildNumber", "setAppVersionCode", "setApiUrl", "setFrameUrl", "isOpened", "open", "close", "on", "setLanguage", "setOfflineMode", "initialize", "disableConsoleLogOverwrite", "logEvent", "hide", "enableShortcuts", "showFeedbackButton", "destroy", "getIdentity", "isUserIdentified", "clearIdentity", "openConversations", "openConversation", "openHelpCenterCollection", "openHelpCenterArticle", "openHelpCenter", "searchHelpCenter", "openNewsArticle", "openChecklists", "startChecklist", "openNews", "openFeatureRequests", "isLiveMode"], Gleap.f = function (e) { return function () { var t = Array.prototype.slice.call(arguments); window.GleapActions.push({ e: e, a: t }) } }, t = 0; t < Gleap.methods.length; t++)Gleap[i = Gleap.methods[t]] = Gleap.f(i); Gleap.load = function () { var t = document.getElementsByTagName("head")[0], i = document.createElement("script"); i.type = "text/javascript", i.async = !0, i.src = "https://sdk.gleap.io/latest/index.js", t.appendChild(i) }, Gleap.load(),
+                    Gleap.initialize("utFIO0sh3olA4zAWGNgy6C7x0dCiyNIc")
+            }
+        }();
+    </script>
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         /* list little space at the bottom */
         li {
@@ -84,8 +104,32 @@
                 <!-- Requests will be added here dynamically -->
             </ul>
         </div>
+        <br>
         <div>
-            <p>This Spotify downloader is legal for personal use only. The music may not be distributed or played in public.</p>
+            <h3>FAQ</h3>
+            <p><b>Q: How do I download songs?</b></p>
+            <p>A: Enter a song title or URL and press Search. Once the song is found, click Download.</p>
+            <p><b>Q: How do I download playlists?</b></p>
+            <p>A: You can download playlists by entering a playlist URL. The playlist must be public.</p>
+            <p><b>What are Audio Providers?</b></p>
+            <p>Audio Providers are the sources, where the audio is downloaded from (it is not directly downloaded from
+                Spotify).</p>
+            <p><b>What are Lyrics Providers?</b></p>
+            <p>Lyrics Providers are the sources, where the lyrics are downloaded from. If you don't want lyrics, select
+                NONE.</p>
+            <p><b>What are Output Formats?</b></p>
+            <p>Output Formats are the formats, the audio is converted to. If you don't know what to choose, select MP3.
+            </p>
+            <p><b>Q: Why has my download an error.txt file inside?</b></p>
+            <p>This is, because an error occured, when trying to download this song. It propably is not available. Try
+                using another Audio Provider</p>
+            <p><b>Q: Why is my download pending?</b></p>
+            <p>This is because the song is currently being downloaded. Please wait a few minutes. If you are searching
+                for a playlist, the process can easily take up to 10-20 minutes.</p>
+            <br>
+            <h3>Disclaimer</h3>
+            <p>This Spotify downloader is legal for personal use only. The music may not be distributed or played in
+                public.</p>
         </div>
     </div>
 
@@ -96,16 +140,55 @@
             var requestElements = {};
             var requestIdCounter = 0;
 
-            function initiateDownload() {
+            async function initiateDownload() {
                 var search_query = $("#search_query").val();
                 var audio_format = $("#audio_format").val();
                 var lyrics_format = $("#lyrics_format").val();
                 var output_format = $("#output_format").val();
 
-                if (search_query.trim() === '' || audio_format.trim() === '' || lyrics_format.trim() === '' || output_format.trim() === '') {
-                    alert("Please fill in all input fields.");
+                if (!(search_query.trim() === '' || audio_format.trim() === '' || lyrics_format.trim() === '' || output_format.trim() === '')) {
+                    if (search_query.includes("https://open.spotify.com/playlist/")) {
+                        if (getCookie("playlistNotification") == "") {
+                            const { value: accept } = await Swal.fire({
+                                title: 'Info...',
+                                color: 'black',
+                                icon: 'info',
+                                text: 'Downloading a playlist can take a few minutes.',
+                                input: 'checkbox',
+                                inputValue: 0,
+                                inputPlaceholder: 'Do not show again',
+                                confirmButtonText: 'OK',
+                            })
+                            if (accept) {
+                                setCookie("playlistNotification", true, 365);
+                            }
+                        }
+                    } else if (!search_query.includes("https://open.spotify.com/track/")) {
+                        if (getCookie("trackNotification") == "") {
+                            const { value: accept } = await Swal.fire({
+                                title: 'Info...',
+                                color: 'black',
+                                icon: 'info',
+                                text: 'Search queries are often very imprecise. Please use links if you want to get accurate results.',
+                                input: 'checkbox',
+                                inputValue: 0,
+                                inputPlaceholder: 'Do not show again',
+                                confirmButtonText: 'OK',
+                            })
+                            if (accept) {
+                                setCookie("trackNotification", true, 365);
+                            }
+                        }
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: 'Please provide a search query or link!',
+                    })
                     return;
                 }
+
 
                 var requestId = 'request_' + (requestIdCounter++);
                 var requestItem = '<li id="' + requestId + '"><span>' + search_query + ' (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>';
@@ -172,6 +255,46 @@
                 }
             });
         });
+    </script>
+    <script>
+        function setCookie(cname, cvalue, exdays) {
+            const d = new Date();
+            d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+            let expires = "expires=" + d.toUTCString();
+            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+        }
+
+        function getCookie(cname) {
+            const name = cname + "=";
+            const decodedCookie = decodeURIComponent(document.cookie);
+            const ca = decodedCookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') {
+                    c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                    return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+
+        function checkCookie() {
+            let user = getCookie("username");
+            if (user != "") {
+                alert("Welcome again " + user);
+            } else {
+                user = prompt("Please enter your name:", "");
+                if (user != "" && user != null) {
+                    setCookie("username", user, 365);
+                }
+            }
+        }
+
+        function eraseCookie(name) {
+            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        }
     </script>
 </body>
 
