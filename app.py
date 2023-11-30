@@ -2,11 +2,20 @@ import os
 import subprocess
 import threading
 from flask import Flask, render_template, request, jsonify, send_file
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import uuid
 import shutil
 import time
+import json
 
 app = Flask(__name__)
+
+# Limit the amount of requests per IP
+limiter = Limiter(
+    get_remote_address,
+    app=app
+)
 
 # A file to store pending request UUIDs
 pending_requests_file = 'pending_requests.txt'
@@ -34,7 +43,15 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
         try:
             shutil.make_archive(download_folder, 'zip', download_folder)
         except FileNotFoundError as e:
-            time.sleep(1)
+            # wait for the folder to be created and break out after max 30 minutes
+            for i in range(1800):
+                time.sleep(1)
+                if os.path.isdir(download_folder):
+                    break
+            else:
+                # Create an empty zip file
+                with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
+                    error_file.write("Error downloading song")
             shutil.make_archive(download_folder, 'zip', download_folder)
     else:
         # Create an empty zip file
@@ -58,7 +75,16 @@ def index():
     return render_template('index.html', pending_requests=get_pending_requests())
 
 @app.route('/search', methods=['POST'])
+@limiter.limit("10/minute")
 def search():
+    # add counter of amount of searches and save to json file
+    with open('searches.json', 'r') as f:
+        searches = json.load(f)
+    searches['total'] += 1
+    searches['last'] = request.form['search_query']
+    with open('searches.json', 'w') as f:
+        json.dump(searches, f)
+
     search_query = request.form['search_query']
     audio_format = request.form['audio_format']
     lyrics_format = request.form['lyrics_format']
@@ -113,4 +139,8 @@ def get_pending_requests():
 
 if __name__ == '__main__':
     os.makedirs('templates/download', exist_ok=True)
+    # create json file if it doesn't exist
+    if not os.path.isfile('searches.json'):
+        with open('searches.json', 'w') as f:
+            json.dump({'total': 0, 'last': ''}, f)
     app.run(host='0.0.0.0', port=5000, debug=False)

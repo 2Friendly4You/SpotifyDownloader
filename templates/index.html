@@ -18,9 +18,12 @@
     <meta property="og:url" content="https://sd.codemagie.xyz/">
     <link rel="icon" href="https://tobiasrick.de/SpotifyDownloader.png" type="image/png">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
+
     <title>Spotify Downloader</title>
-    <!-- Include Bootstrap CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8J4JDM8GTP"></script>
@@ -31,21 +34,72 @@
 
         gtag('config', 'G-8J4JDM8GTP');
     </script>
+    <!--Bootstrap-->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 
-    <script>
-        !function (Gleap, t, i) {
-            if (!(Gleap = window.Gleap = window.Gleap || []).invoked) {
-                for (window.GleapActions = [], Gleap.invoked = !0, Gleap.methods = ["identify", "setEnvironment", "setTags", "attachCustomData", "setCustomData", "removeCustomData", "clearCustomData", "registerCustomAction", "trackEvent", "log", "preFillForm", "showSurvey", "sendSilentCrashReport", "startFeedbackFlow", "startBot", "setAppBuildNumber", "setAppVersionCode", "setApiUrl", "setFrameUrl", "isOpened", "open", "close", "on", "setLanguage", "setOfflineMode", "initialize", "disableConsoleLogOverwrite", "logEvent", "hide", "enableShortcuts", "showFeedbackButton", "destroy", "getIdentity", "isUserIdentified", "clearIdentity", "openConversations", "openConversation", "openHelpCenterCollection", "openHelpCenterArticle", "openHelpCenter", "searchHelpCenter", "openNewsArticle", "openChecklists", "startChecklist", "openNews", "openFeatureRequests", "isLiveMode"], Gleap.f = function (e) { return function () { var t = Array.prototype.slice.call(arguments); window.GleapActions.push({ e: e, a: t }) } }, t = 0; t < Gleap.methods.length; t++)Gleap[i = Gleap.methods[t]] = Gleap.f(i); Gleap.load = function () { var t = document.getElementsByTagName("head")[0], i = document.createElement("script"); i.type = "text/javascript", i.async = !0, i.src = "https://sdk.gleap.io/latest/index.js", t.appendChild(i) }, Gleap.load(),
-                    Gleap.initialize("utFIO0sh3olA4zAWGNgy6C7x0dCiyNIc")
-            }
-        }();
-    </script>
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
+        :root[data-theme="light"] {
+            --text: #020302;
+            --background: #fcfdfc;
+            --primary: #47ff47;
+            --secondary: #d0e2d0;
+            --accent: #588d58;
+        }
+
+        :root[data-theme="dark"] {
+            --text: #fcfdfc;
+            --background: #020302;
+            --primary: #00b800;
+            --secondary: #1d2f1d;
+            --accent: #72a772;
+        }
+
+        /* change default website scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--background);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #5f5f5f;
+            border-radius: 10px;
+        }
+
+
+        body {
+            word-wrap: break-word;
+            font-family: 'Roboto', sans-serif;
+            color: var(--text);
+            background-color: var(--background);
+
+            font-size: larger;
+        }
+
         /* list little space at the bottom */
         li {
             margin-bottom: 5px;
+        }
+
+        .lightMode {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            border-radius: 20%;
+            border-width: 2px;
+            border-style: solid;
+            /* center */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* size */
+            width: 40px;
+            height: 40px;
+
         }
     </style>
 </head>
@@ -125,12 +179,21 @@
             <p><b>Q: Why is my download pending?</b></p>
             <p>This is because the song is currently being downloaded. Please wait a few minutes. If you are searching
                 for a playlist, the process can easily take up to 10-20 minutes.</p>
+            <p><b>Q: Why is there an Error that is called TOO MANY DOWNLOADS?</b></p>
+            <p>This is because you have downloaded too many songs in a short period of time. Please wait a few minutes
+                and try again. The cap currently is 10 per minute.</p>
             <br>
             <h3>Disclaimer</h3>
             <p>This Spotify downloader is legal for personal use only. The music may not be distributed or played in
                 public.</p>
         </div>
     </div>
+    <br><br>
+    <button class="lightMode" onclick="changeLightMode()">
+        <span class="material-symbols-outlined">
+            settings_brightness
+        </span>
+    </button>
 
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -188,48 +251,63 @@
                     return;
                 }
 
-                
+
                 var requestId = 'request_' + (requestIdCounter++);
                 var requestItem = '<li id="' + requestId + '"><span>' + search_query + ' (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>';
                 $("#requests-list").append(requestItem);
+
 
                 $.post('/search', {
                     search_query: search_query,
                     audio_format: audio_format,
                     lyrics_format: lyrics_format,
                     output_format: output_format
-                }, function (data) {
-                    if (data.status === 'completed') {
-                        var requestElement = $('#' + requestId);
-                        requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                        var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + data.unique_id + '">Download</a>';
-                        requestElement.append(downloadButton);
-                    } else {
-                        function checkStatus(uuid, unique_id) {
-                            var requestElement = $('#' + uuid);
-                            var downloadButtonExists = requestElement.find('.btn-success').length > 0;
+                })
+                    .done(function (data, textStatus, jqXHR) {
+                        console.log(data);
+                        if (jqXHR.status === 429) {
+                            // Handle status code 429 (Too Many Requests)
+                            var requestElement = $('#' + requestId);
+                            requestElement.find('span').text(search_query + ' (Error: ' + jqXHR.status + ': Too Many Requests)');
+                        } else if (data.status === 'completed') {
+                            var requestElement = $('#' + requestId);
+                            requestElement.find('span').text(search_query + ' (' + data.status + ')');
+                            var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + data.unique_id + '">Download</a>';
+                            requestElement.append(downloadButton);
+                        } else {
+                            function checkStatus(uuid, unique_id) {
+                                var requestElement = $('#' + uuid);
+                                var downloadButtonExists = requestElement.find('.btn-success').length > 0;
 
-                            if (downloadButtonExists) {
-                                requestElement.find('.spinner-border').remove();
-                                clearInterval(requestElements[uuid]);
-                            } else {
-                                $.get('/status/' + unique_id, function (data) {
-                                    if (data.status === 'completed') {
-                                        requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                                        var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + unique_id + '">Download</a>';
-                                        requestElement.append(downloadButton);
-                                        requestElement.find('.spinner-border').remove();
-                                        clearInterval(requestElements[uuid]);
-                                    }
-                                });
+                                if (downloadButtonExists) {
+                                    requestElement.find('.spinner-border').remove();
+                                    clearInterval(requestElements[uuid]);
+                                } else {
+                                    $.get('/status/' + unique_id, function (data) {
+                                        if (data.status === 'completed') {
+                                            requestElement.find('span').text(search_query + ' (' + data.status + ')');
+                                            var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + unique_id + '">Download</a>';
+                                            requestElement.append(downloadButton);
+                                            requestElement.find('.spinner-border').remove();
+                                            clearInterval(requestElements[uuid]);
+                                        }
+                                    });
+                                }
                             }
-                        }
 
-                        requestElements[requestId] = setInterval(function () {
-                            checkStatus(requestId, data.unique_id);
-                        }, 10000);
-                    }
-                });
+                            requestElements[requestId] = setInterval(function () {
+                                checkStatus(requestId, data.unique_id);
+                            }, 10000);
+                        }
+                    })
+                    .fail(function (jqXHR, textStatus, errorThrown) {
+                        // Handle the failure, e.g., display an error message
+                        console.error('Request failed:', textStatus, errorThrown);
+                        var requestElement = $('#' + requestId);
+                        requestElement.find('span').text(search_query + ' (Error: ' + errorThrown +')');
+                        requestElement.find('.spinner-border').remove();
+                    });
+
             }
 
             $("#search-form").submit(function (event) {
@@ -294,6 +372,33 @@
         function eraseCookie(name) {
             document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         }
+    </script>
+    <script>
+        // save to local storage
+        function changeLightMode() {
+            if (localStorage.getItem("lightMode") == "true") {
+                localStorage.setItem("lightMode", "false");
+            } else {
+                localStorage.setItem("lightMode", "true");
+            }
+            setLightMode();
+        }
+
+        // load from local storage
+        function setLightMode() {
+            if (localStorage.getItem("lightMode") == "true") {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        }
+
+        // check if light mode is set
+        if (localStorage.getItem("lightMode") == null) {
+            localStorage.setItem("lightMode", "false");
+        }
+
+        setLightMode();
     </script>
 </body>
 
