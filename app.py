@@ -4,6 +4,7 @@ import threading
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import limits.storage
 import uuid
 import shutil
 import time
@@ -11,10 +12,14 @@ import json
 
 app = Flask(__name__)
 
+uri = 'memcached://localhost:11211' # URI to the storage backend
+
 # Limit the amount of requests per IP
 limiter = Limiter(
     get_remote_address,
-    app=app
+    app=app,
+    storage_uri=uri,
+    storage_options={}
 )
 
 # A file to store pending request UUIDs
