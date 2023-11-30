@@ -181,7 +181,7 @@
                 for a playlist, the process can easily take up to 10-20 minutes.</p>
             <p><b>Q: Why is there an Error that is called TOO MANY DOWNLOADS?</b></p>
             <p>This is because you have downloaded too many songs in a short period of time. Please wait a few minutes
-                and try again. The cap currently is 10 per minute.</p>
+                and try again. The cap currently is 1 per 5 seconds and 10 per minute.</p>
             <br>
             <h3>Disclaimer</h3>
             <p>This Spotify downloader is legal for personal use only. The music may not be distributed or played in
@@ -304,7 +304,7 @@
                         // Handle the failure, e.g., display an error message
                         console.error('Request failed:', textStatus, errorThrown);
                         var requestElement = $('#' + requestId);
-                        requestElement.find('span').text(search_query + ' (Error: ' + errorThrown +')');
+                        requestElement.find('span').text(search_query + ' (Error)');
                         requestElement.find('.spinner-border').remove();
                     });
 

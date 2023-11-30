@@ -80,7 +80,7 @@ def index():
     return render_template('index.html', pending_requests=get_pending_requests())
 
 @app.route('/search', methods=['POST'])
-@limiter.limit("10/minute")
+@limiter.limit("1/5seconds;10/minute")
 def search():
     # add counter of amount of searches and save to json file
     with open('searches.json', 'r') as f:
