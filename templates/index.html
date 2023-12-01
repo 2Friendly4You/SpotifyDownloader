@@ -158,6 +158,9 @@
             </ul>
         </div>
         <br>
+        <h3>Download counter</h3>
+        <span><span id="downloadCounter"></span> Songs/ Playlists were already downloaded</p>
+        <br>
         <div>
             <h3>FAQ</h3>
             <p><b>Q: How do I download songs?</b></p>
@@ -264,7 +267,8 @@
                     output_format: output_format
                 })
                     .done(function (data, textStatus, jqXHR) {
-                        console.log(data);
+                        // increment download counter
+                        incrementDownloadCounter();
                         if (jqXHR.status === 429) {
                             // Handle status code 429 (Too Many Requests)
                             var requestElement = $('#' + requestId);
@@ -399,6 +403,17 @@
         }
 
         setLightMode();
+    </script>
+    <script>
+        // download counter
+        $.get('/download_counter', function (data) {
+            $("#downloadCounter").text(data);
+        });
+
+        function incrementDownloadCounter() {
+            // just increment the counter locally
+            $("#downloadCounter").text(parseInt($("#downloadCounter").text()) + 1);
+        }
     </script>
 </body>
 

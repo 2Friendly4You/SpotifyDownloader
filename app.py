@@ -108,6 +108,13 @@ def search():
 
     return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id})
 
+@app.route('/download_counter', methods=['GET'])
+def download_counter():
+    with open('searches.json', 'r') as f:
+        searches = json.load(f)
+    return str(searches['total'])
+
+
 @app.route('/status/<unique_id>', methods=['GET'])
 def check_request(unique_id):
     pending_requests = get_pending_requests()
