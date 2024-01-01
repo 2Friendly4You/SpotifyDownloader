@@ -35,9 +35,9 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
 
     # Run spotdl with the provided parameters and unique folder
     if not lyrics_format:
-        command = f'spotdl "{search_query}" --audio {audio_format} --format {output_format} --output "{download_folder}"'
+        command = f'spotdl "{search_query}" --max-retries 5 --audio {audio_format} --format {output_format} --output "{download_folder}"'
     else:
-        command = f'spotdl "{search_query}" --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
+        command = f'spotdl "{search_query}" --max-retries 5 --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
     try:
         result = subprocess.run(command, shell=True, check=True, text=True)
     except subprocess.CalledProcessError as e:
