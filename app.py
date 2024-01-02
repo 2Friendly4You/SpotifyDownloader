@@ -34,12 +34,13 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     os.makedirs(download_folder, exist_ok=True)
 
     # Run spotdl with the provided parameters and unique folder
-    if not lyrics_format:
-        command = f'spotdl "{search_query}" --max-retries 5 --audio {audio_format} --format {output_format} --output "{download_folder}"'
-    else:
-        command = f'spotdl "{search_query}" --max-retries 5 --audio {audio_format} --lyrics {lyrics_format} --format {output_format} --output "{download_folder}"'
+    # Securely construct the command to prevent command injection
+    command = ['spotdl', search_query, '--max-retries', '5', '--audio', audio_format, '--format', output_format, '--output', download_folder]
+    if lyrics_format:
+        command.extend(['--lyrics', lyrics_format])
+
     try:
-        result = subprocess.run(command, shell=True, check=True, text=True)
+        result = subprocess.run(command, check=True, text=True)
     except subprocess.CalledProcessError as e:
         result = e
 
