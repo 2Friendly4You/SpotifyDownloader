@@ -10,7 +10,7 @@ import time
 import json
 
 app = Flask(__name__)
-music_directory = "/var/www/html/SpotifyDownloader/"
+music_directory = "/var/www/SpotifyDownloader/"
 
 uri = 'memcached://localhost:11211'  # URI to the storage backend
 
