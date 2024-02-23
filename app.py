@@ -37,8 +37,7 @@ def validate_spotify_url(input_url):
     """Validate if the input URL is a valid Spotify link."""
     parsed_url = urlparse(input_url)
     return parsed_url.scheme in ['http', 'https'] and \
-           parsed_url.netloc == 'open.spotify.com' and \
-           parsed_url.path.split('/')[1] in ['track', 'album', 'playlist']
+           parsed_url.netloc == 'open.spotify.com'
 
 def validate_song_title(title):
     """Basic validation for song titles."""
