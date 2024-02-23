@@ -109,7 +109,7 @@ def check_request(unique_id):
 @app.route('/download/<unique_id>', methods=['GET', 'POST'])
 def download(unique_id):
     download_file_path = unique_id + ".zip"
-    download_url = f"https://sd.codemagie.xyz/music/{download_file_path}"
+    download_url = f"https://sddata.codemagie.xyz/music/{download_file_path}"
     # Check if the file exists
     if os.path.isfile(os.path.join(music_directory, download_file_path)):
         return jsonify({'status': 'success', 'message': 'File ready for download', 'url': download_url})
