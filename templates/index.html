@@ -137,7 +137,6 @@
                         <option value="genius">genius</option>
                         <option value="azlyrics">azlyrics</option>
                         <option value="synced">synced</option>
-                        <option value="">NONE</option>
                     </select>
                 </div>
                 <div class="form-group col-md-4">
@@ -176,11 +175,9 @@
                 <p><b>What are Audio Providers?</b></p>
                 <p>Audio Providers are the sources, where the audio is downloaded from (it is not directly downloaded
                     from
-                    Spotify).</p>
+                    Spotify). If you don't know what to choose, select "Youtube Music"</p>
                 <p><b>What are Lyrics Providers?</b></p>
-                <p>Lyrics Providers are the sources, where the lyrics are downloaded from. If you don't want lyrics,
-                    select
-                    NONE.</p>
+                <p>Lyrics Providers are the sources, where the lyrics are downloaded from.</p>
                 <p><b>What are Output Formats?</b></p>
                 <p>Output Formats are the formats, the audio is converted to. If you don't know what to choose, select
                     MP3.
@@ -267,11 +264,9 @@
                     return;
                 }
 
-
                 var requestId = 'request_' + (requestIdCounter++);
                 var requestItem = '<li id="' + requestId + '"><span>' + search_query + ' (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>';
                 $("#requests-list").append(requestItem);
-
 
                 $.post('/search', {
                     search_query: search_query,
@@ -279,64 +274,35 @@
                     lyrics_format: lyrics_format,
                     output_format: output_format
                 })
-                    .done(function (data, textStatus, jqXHR) {
-                        // increment download counter
+                    .done(function (data) {
                         incrementDownloadCounter();
-                        if (jqXHR.status === 429) {
-                            // Handle status code 429 (Too Many Requests)
-                            var requestElement = $('#' + requestId);
-                            requestElement.find('span').text(search_query + ' (Error: ' + jqXHR.status + ': Too Many Requests)');
-                        } else if (data.status === 'completed') {
-                            var requestElement = $('#' + requestId);
-                            requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                            var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + data.unique_id + '">Download</a>';
-                            requestElement.append(downloadButton);
-                        } else {
-                            function checkStatus(uuid, unique_id) {
-                                var requestElement = $('#' + uuid);
-                                var downloadButtonExists = requestElement.find('.btn-success').length > 0;
-
-                                if (downloadButtonExists) {
-                                    requestElement.find('.spinner-border').remove();
-                                    clearInterval(requestElements[uuid]);
-                                } else {
-                                    $.get('/status/' + unique_id, function (data) {
-                                        if (data.status === 'completed') {
-                                            requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                                            var downloadButton = '<a class="btn btn-success" target="_blank" href="/download/' + unique_id + '">Download</a>';
-                                            requestElement.append(downloadButton);
-                                            requestElement.find('.spinner-border').remove();
-                                            clearInterval(requestElements[uuid]);
-                                        }
-                                    });
-                                }
-                            }
-
-                            requestElements[requestId] = setInterval(function () {
-                                checkStatus(requestId, data.unique_id);
-                            }, 10000);
+                        var requestElement = $('#' + requestId);
+                        if (data.status === 'success') {
+                            requestElement.find('span').text(search_query + ' (' + data.message + ')');
+                            var downloadLink = '<a class="btn btn-success" href="' + data.url + '" target="_blank">Download</a>';
+                            requestElement.append(downloadLink);
+                            requestElement.find('.spinner-border').remove();
+                        } else if (data.status === 'error') {
+                            requestElement.find('span').text(search_query + ' (Error: ' + data.message + ')');
+                            requestElement.find('.spinner-border').remove();
                         }
                     })
                     .fail(function (jqXHR, textStatus, errorThrown) {
-                        // Handle the failure, e.g., display an error message
                         console.error('Request failed:', textStatus, errorThrown);
                         var requestElement = $('#' + requestId);
                         requestElement.find('span').text(search_query + ' (Error)');
                         requestElement.find('.spinner-border').remove();
                     });
-
             }
 
             $("#search-form").submit(function (event) {
                 event.preventDefault();
                 initiateDownload();
-                // clear input
                 $("#search_query").val('');
             });
 
             $("#download-button").click(function () {
                 initiateDownload();
-                // clear input
                 $("#search_query").val('');
             });
 
@@ -344,89 +310,64 @@
                 if (e.which === 13) {
                     e.preventDefault();
                     initiateDownload();
-                    // clear input
                     $("#search_query").val('');
                 }
             });
-        });
-    </script>
-    <script>
-        function setCookie(cname, cvalue, exdays) {
-            const d = new Date();
-            d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
-            let expires = "expires=" + d.toUTCString();
-            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
-        }
 
-        function getCookie(cname) {
-            const name = cname + "=";
-            const decodedCookie = decodeURIComponent(document.cookie);
-            const ca = decodedCookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) == ' ') {
-                    c = c.substring(1);
+            function setCookie(cname, cvalue, exdays) {
+                const d = new Date();
+                d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+                let expires = "expires=" + d.toUTCString();
+                document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+            }
+
+            function getCookie(cname) {
+                const name = cname + "=";
+                const decodedCookie = decodeURIComponent(document.cookie);
+                const ca = decodedCookie.split(';');
+                for (let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) == ' ') {
+                        c = c.substring(1);
+                    }
+                    if (c.indexOf(name) == 0) {
+                        return c.substring(name.length, c.length);
+                    }
                 }
-                if (c.indexOf(name) == 0) {
-                    return c.substring(name.length, c.length);
+                return "";
+            }
+
+            function changeLightMode() {
+                if (localStorage.getItem("lightMode") == "true") {
+                    localStorage.setItem("lightMode", "false");
+                } else {
+                    localStorage.setItem("lightMode", "true");
+                }
+                setLightMode();
+            }
+
+            function setLightMode() {
+                if (localStorage.getItem("lightMode") == "true") {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
                 }
             }
-            return "";
-        }
 
-        function checkCookie() {
-            let user = getCookie("username");
-            if (user != "") {
-                alert("Welcome again " + user);
-            } else {
-                user = prompt("Please enter your name:", "");
-                if (user != "" && user != null) {
-                    setCookie("username", user, 365);
-                }
-            }
-        }
-
-        function eraseCookie(name) {
-            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        }
-    </script>
-    <script>
-        // save to local storage
-        function changeLightMode() {
-            if (localStorage.getItem("lightMode") == "true") {
+            if (localStorage.getItem("lightMode") == null) {
                 localStorage.setItem("lightMode", "false");
-            } else {
-                localStorage.setItem("lightMode", "true");
             }
+
             setLightMode();
-        }
 
-        // load from local storage
-        function setLightMode() {
-            if (localStorage.getItem("lightMode") == "true") {
-                document.documentElement.setAttribute('data-theme', 'light');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'dark');
+            $.get('/download_counter', function (data) {
+                $("#downloadCounter").text(data);
+            });
+
+            function incrementDownloadCounter() {
+                $("#downloadCounter").text(parseInt($("#downloadCounter").text()) + 1);
             }
-        }
-
-        // check if light mode is set
-        if (localStorage.getItem("lightMode") == null) {
-            localStorage.setItem("lightMode", "false");
-        }
-
-        setLightMode();
-    </script>
-    <script>
-        // download counter
-        $.get('/download_counter', function (data) {
-            $("#downloadCounter").text(data);
         });
-
-        function incrementDownloadCounter() {
-            // just increment the counter locally
-            $("#downloadCounter").text(parseInt($("#downloadCounter").text()) + 1);
-        }
     </script>
 </body>
 

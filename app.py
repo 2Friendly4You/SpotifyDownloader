@@ -1,43 +1,35 @@
+from flask import Flask, request, jsonify, render_template
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 import subprocess
 import threading
-from flask import Flask, render_template, request, jsonify, send_file
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-import limits.storage
 import uuid
 import shutil
 import time
 import json
 
 app = Flask(__name__)
+music_directory = "/var/www/html/SpotifyDownloader/"
 
-uri = 'memcached://localhost:11211' # URI to the storage backend
+uri = 'memcached://localhost:11211'  # URI to the storage backend
 
-# Limit the amount of requests per IP
 limiter = Limiter(
-    get_remote_address,
     app=app,
+    key_func=get_remote_address,
     storage_uri=uri,
-    storage_options={}
 )
 
-# A file to store pending request UUIDs
 pending_requests_file = 'pending_requests.txt'
 
 def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
-    # Mark the request as pending in the shared file
     with open(pending_requests_file, 'a') as pending_file:
         pending_file.write(unique_id + '\n')
 
-    download_folder = os.path.join('templates', 'download', unique_id)
+    download_folder = os.path.join(music_directory, unique_id)
     os.makedirs(download_folder, exist_ok=True)
 
-    # Run spotdl with the provided parameters and unique folder
-    # Securely construct the command to prevent command injection
     command = ['spotdl', search_query, '--max-retries', '5', '--audio', audio_format, '--format', output_format, '--output', download_folder]
-    if lyrics_format:
-        command.extend(['--lyrics', lyrics_format])
 
     try:
         result = subprocess.run(command, check=True, text=True)
@@ -45,30 +37,19 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
         result = e
 
     if result.returncode == 0:
-        # Create a zip file with the contents of the folder
         try:
             shutil.make_archive(download_folder, 'zip', download_folder)
-        except FileNotFoundError as e:
-            # wait for the folder to be created and break out after max 30 minutes
-            for i in range(1800):
-                time.sleep(1)
-                if os.path.isdir(download_folder):
-                    break
-            else:
-                # Create an empty zip file
-                with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
-                    error_file.write("Error downloading song")
+        except FileNotFoundError:
+            with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
+                error_file.write("Error downloading song")
             shutil.make_archive(download_folder, 'zip', download_folder)
     else:
-        # Create an empty zip file
         with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
             error_file.write("Error downloading song")
         shutil.make_archive(download_folder, 'zip', download_folder)
 
-    # Remove the original folder
     shutil.rmtree(download_folder)
 
-    # Remove the request from the shared file when completed
     with open(pending_requests_file, 'r') as pending_file:
         lines = pending_file.readlines()
     with open(pending_requests_file, 'w') as pending_file:
@@ -127,14 +108,14 @@ def check_request(unique_id):
 
 @app.route('/download/<unique_id>', methods=['GET', 'POST'])
 def download(unique_id):
-    download_file = os.path.join('templates', 'download', unique_id + ".zip")
-    if os.path.isfile(download_file):
-        # create thread that deletes the file after 1 hour with exception handling
-        thread = threading.Thread(target=delete_file, args=(download_file,))
-        thread.start()
-        return send_file(download_file, as_attachment=True)
+    download_file_path = unique_id + ".zip"
+    download_url = f"https://sd.codemagie.xyz/music/{download_file_path}"
+    # Check if the file exists
+    if os.path.isfile(os.path.join(music_directory, download_file_path)):
+        return jsonify({'status': 'success', 'message': 'File ready for download', 'url': download_url})
     else:
         return jsonify({'status': 'error', 'message': 'File not found'})
+
 
 def delete_file(download_file):
     try:
@@ -151,7 +132,7 @@ def get_pending_requests():
         return []
 
 if __name__ == '__main__':
-    os.makedirs('templates/download', exist_ok=True)
+    os.makedirs(music_directory, exist_ok=True)
     # create json file if it doesn't exist
     if not os.path.isfile('searches.json'):
         with open('searches.json', 'w') as f:
