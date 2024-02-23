@@ -103,7 +103,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
 
 @app.route('/')
 def index():
-    return render_template('index.html', pending_requests=get_pending_requests())
+    return render_template('index.html', pending_requests=get_pending_requests()), 200
 
 @app.route('/search', methods=['POST'])
 @limiter.limit("1/5seconds;10/minute")
@@ -122,25 +122,21 @@ def search():
     lyrics_format = request.form.get('lyrics_format')
     output_format = request.form.get('output_format')
 
-    # Validate search query and selections
     if not search_query:
-        return jsonify({'status': 'error', 'message': 'Search query is required'})
+        return jsonify({'status': 'error', 'message': 'Search query is required'}), 400
 
+    # validate search query and form data and send 400 bad request if invalid
     if not validate_input(search_query) or \
        not validate_audio_provider(audio_format) or \
        not validate_lyrics_provider(lyrics_format) or \
        not validate_output_format(output_format):
-        return jsonify({'status': 'error', 'message': 'Invalid input provided'})
+        return jsonify({'status': 'error', 'message': 'Invalid input provided'}), 400
 
     unique_id = str(uuid.uuid4())
     thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
     thread.start()
 
-    return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id})
-
-    thread.start()
-
-    return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id})
+    return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id}), 202
 
 @app.route('/download_counter', methods=['GET'])
 def download_counter():
@@ -154,13 +150,13 @@ def check_request(unique_id):
     pending_requests = get_pending_requests()
 
     if unique_id in pending_requests:
-        return jsonify({'status': 'pending'})
+        return jsonify({'status': 'pending'}), 202
     else:
         # Check if the file exists
         if os.path.isfile(os.path.join(music_directory, unique_id + ".zip")):
-            return jsonify({'status': 'completed', 'url': 'https://sddata.codemagie.xyz/music/' + unique_id + '.zip'})
+            return jsonify({'status': 'completed', 'url': 'https://sddata.codemagie.xyz/music/' + unique_id + '.zip'}), 200
         else:
-            return jsonify({'status': 'error', 'message': 'File not found'})
+            return jsonify({'status': 'error', 'message': 'File not found'}), 404
 
 
 def delete_file(download_file):
