@@ -73,7 +73,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     download_folder = os.path.join(music_directory, unique_id)
     os.makedirs(download_folder, exist_ok=True)
 
-    command = ['spotdl', search_query, '--max-retries', '5', '--audio', audio_format, '--format', output_format, '--output', download_folder]
+    command = ['spotdl', search_query, '--max-retries', '5', '--audio', audio_format, '--format', output_format, '--output', download_folder, '--threads', '8']
 
     try:
         result = subprocess.run(command, check=True, text=True)
