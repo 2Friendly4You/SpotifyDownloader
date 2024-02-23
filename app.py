@@ -42,7 +42,7 @@ def validate_spotify_url(input_url):
 
 def validate_song_title(title):
     """Basic validation for song titles."""
-    return bool(re.match(r"^[a-zA-Z0-9\s\-'.,!&?=]+$", title))
+    return bool(re.match(r"^[a-zA-Z0-9\s\-'.,!&?=-]+$", title))
 
 def validate_input(input_string):
     """Determine if input is a Spotify URL or song title, then validate accordingly."""
