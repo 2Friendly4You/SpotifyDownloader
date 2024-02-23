@@ -104,17 +104,11 @@ def check_request(unique_id):
     if unique_id in pending_requests:
         return jsonify({'status': 'pending'})
     else:
-        return jsonify({'status': 'completed'})
-
-@app.route('/download/<unique_id>', methods=['GET', 'POST'])
-def download(unique_id):
-    download_file_path = unique_id + ".zip"
-    download_url = f"https://sddata.codemagie.xyz/music/{download_file_path}"
-    # Check if the file exists
-    if os.path.isfile(os.path.join(music_directory, download_file_path)):
-        return jsonify({'status': 'success', 'message': 'File ready for download', 'url': download_url})
-    else:
-        return jsonify({'status': 'error', 'message': 'File not found'})
+        # Check if the file exists
+        if os.path.isfile(os.path.join(music_directory, unique_id + ".zip")):
+            return jsonify({'status': 'completed', 'url': 'https://sddata.codemagie.xyz/music/' + unique_id + '.zip'})
+        else:
+            return jsonify({'status': 'error', 'message': 'File not found'})
 
 
 def delete_file(download_file):
