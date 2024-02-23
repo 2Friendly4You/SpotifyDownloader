@@ -8,6 +8,8 @@ import uuid
 import shutil
 import time
 import json
+from urllib.parse import urlparse
+import re
 
 app = Flask(__name__)
 music_directory = "/var/www/SpotifyDownloader/"
@@ -21,6 +23,48 @@ limiter = Limiter(
 )
 
 pending_requests_file = 'pending_requests.txt'
+
+
+def is_valid_url(input_url):
+    """Check if the input string is a valid URL."""
+    try:
+        result = urlparse(input_url)
+        return all([result.scheme, result.netloc])
+    except:
+        return False
+
+def validate_spotify_url(input_url):
+    """Validate if the input URL is a valid Spotify link."""
+    parsed_url = urlparse(input_url)
+    return parsed_url.scheme in ['http', 'https'] and \
+           parsed_url.netloc == 'open.spotify.com' and \
+           parsed_url.path.split('/')[1] in ['track', 'album', 'playlist']
+
+def validate_song_title(title):
+    """Basic validation for song titles."""
+    return bool(re.match(r"^[a-zA-Z0-9\s\-'.,!&]+$", title))
+
+def validate_input(input_string):
+    """Determine if input is a Spotify URL or song title, then validate accordingly."""
+    if is_valid_url(input_string):
+        return validate_spotify_url(input_string)
+    else:
+        return validate_song_title(input_string)
+
+# Define valid options for each dropdown
+VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'slider-kz', 'soundcloud', 'bandcamp', 'piped'}
+VALID_LYRICS_PROVIDERS = {'musixmatch', 'genius', 'azlyrics', 'synced'}
+VALID_OUTPUT_FORMATS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'}
+
+def validate_audio_provider(selection):
+    return selection in VALID_AUDIO_PROVIDERS
+
+def validate_lyrics_provider(selection):
+    return selection in VALID_LYRICS_PROVIDERS
+
+def validate_output_format(selection):
+    return selection in VALID_OUTPUT_FORMATS
+
 
 def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
     with open(pending_requests_file, 'a') as pending_file:
@@ -64,28 +108,36 @@ def index():
 @app.route('/search', methods=['POST'])
 @limiter.limit("1/5seconds;10/minute")
 def search():
-    # add counter of amount of searches and save to json file
+    # Load search counter and last search query
     with open('searches.json', 'r') as f:
         searches = json.load(f)
     searches['total'] += 1
-    searches['last'] = request.form['search_query']
+    search_query = request.form['search_query']
+    searches['last'] = search_query
     with open('searches.json', 'w') as f:
         json.dump(searches, f)
 
-    search_query = request.form['search_query']
-    audio_format = request.form['audio_format']
-    lyrics_format = request.form['lyrics_format']
-    output_format = request.form['output_format']
+    # Extract form data
+    audio_format = request.form.get('audio_format')
+    lyrics_format = request.form.get('lyrics_format')
+    output_format = request.form.get('output_format')
 
-    # Check if the search query is empty
+    # Validate search query and selections
     if not search_query:
         return jsonify({'status': 'error', 'message': 'Search query is required'})
 
-    # Generate a new unique ID
-    unique_id = str(uuid.uuid4())
+    if not validate_input(search_query) or \
+       not validate_audio_provider(audio_format) or \
+       not validate_lyrics_provider(lyrics_format) or \
+       not validate_output_format(output_format):
+        return jsonify({'status': 'error', 'message': 'Invalid input provided'})
 
-    # Run spotdl in a background thread
+    unique_id = str(uuid.uuid4())
     thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
+    thread.start()
+
+    return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id})
+
     thread.start()
 
     return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id})
