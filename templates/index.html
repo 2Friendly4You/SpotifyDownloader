@@ -212,117 +212,102 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function () {
-            var requestElements = {};
-            var requestIdCounter = 0;
+            let requestIdCounter = 0;
+            const requestElements = {};
 
-            async function initiateDownload() {
-                var search_query = $("#search_query").val();
-                var audio_format = $("#audio_format").val();
-                var lyrics_format = $("#lyrics_format").val();
-                var output_format = $("#output_format").val();
-
-                if (!(search_query.trim() === '' || audio_format.trim() === '' || lyrics_format.trim() === '' || output_format.trim() === '')) {
-                    if (search_query.includes("https://open.spotify.com/playlist/")) {
-                        if (getCookie("playlistNotification") == "") {
-                            const { value: accept } = await Swal.fire({
-                                title: 'Info...',
-                                color: 'black',
-                                icon: 'info',
-                                text: 'Downloading a playlist can take a few minutes.',
-                                input: 'checkbox',
-                                inputValue: 0,
-                                inputPlaceholder: 'Do not show again',
-                                confirmButtonText: 'OK',
-                            })
-                            if (accept) {
-                                setCookie("playlistNotification", true, 365);
-                            }
-                        }
-                    } else if (!search_query.includes("https://open.spotify.com/track/")) {
-                        if (getCookie("trackNotification") == "") {
-                            const { value: accept } = await Swal.fire({
-                                title: 'Info...',
-                                color: 'black',
-                                icon: 'info',
-                                text: 'Search queries are often very imprecise. Please use links if you want to get accurate results.',
-                                input: 'checkbox',
-                                inputValue: 0,
-                                inputPlaceholder: 'Do not show again',
-                                confirmButtonText: 'OK',
-                            })
-                            if (accept) {
-                                setCookie("trackNotification", true, 365);
-                            }
-                        }
+            // Utility function to display alerts
+            const showAlert = async (title, text, cookieName) => {
+                if (getCookie(cookieName) === "") {
+                    const { value: accept } = await Swal.fire({
+                        title,
+                        color: 'black',
+                        icon: 'info',
+                        text,
+                        input: 'checkbox',
+                        inputValue: 0,
+                        inputPlaceholder: 'Do not show again',
+                        confirmButtonText: 'OK',
+                    });
+                    if (accept) {
+                        setCookie(cookieName, true, 365);
                     }
-                } else {
+                }
+            };
+
+            // Initialize download process
+            const initiateDownload = async () => {
+                const searchQuery = $("#search_query").val().trim();
+                const audioFormat = $("#audio_format").val().trim();
+                const lyricsFormat = $("#lyrics_format").val().trim();
+                const outputFormat = $("#output_format").val().trim();
+
+                if (!searchQuery || !audioFormat || !lyricsFormat || !outputFormat) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Please provide a search query or link!',
-                    })
+                        text: 'Please provide a search query and select all options!',
+                    });
                     return;
                 }
 
+                if (searchQuery.includes("https://open.spotify.com/playlist/")) {
+                    await showAlert('Info...', 'Downloading a playlist can take a few minutes.', "playlistNotification");
+                } else if (!searchQuery.includes("https://open.spotify.com/track/")) {
+                    await showAlert('Info...', 'Search queries are often very imprecise. Please use links if you want to get accurate results.', "trackNotification");
+                }
 
-                var requestId = 'request_' + (requestIdCounter++);
-                var requestItem = '<li id="' + requestId + '"><span>' + search_query + ' (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>';
+                const requestId = `request_${requestIdCounter++}`;
+                const requestItem = `<li id="${requestId}"><span>${searchQuery} (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>`;
                 $("#requests-list").append(requestItem);
 
+                submitDownloadRequest(searchQuery, audioFormat, lyricsFormat, outputFormat, requestId);
+            };
 
-                $.post('/search', {
-                    search_query: search_query,
-                    audio_format: audio_format,
-                    lyrics_format: lyrics_format,
-                    output_format: output_format
-                })
-                    .done(function (data, textStatus, jqXHR) {
-                        // increment download counter
-                        incrementDownloadCounter();
-                        if (jqXHR.status === 429) {
-                            // Handle status code 429 (Too Many Requests)
-                            var requestElement = $('#' + requestId);
-                            requestElement.find('span').text(search_query + ' (Error: ' + jqXHR.status + ': Too Many Requests)');
-                        } else if (data.status === 'completed') {
-                            requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                            var downloadLink = '<a class="btn btn-success" href="' + data.url + '" target="_blank">Download</a>';
-                            requestElement.append(downloadLink);
-                            requestElement.find('.spinner-border').remove();
-                        } else {
-                            function checkStatus(uuid, unique_id) {
-                                var requestElement = $('#' + uuid);
-                                var downloadButtonExists = requestElement.find('.btn-success').length > 0;
+            // Submit the download request
+            const submitDownloadRequest = (searchQuery, audioFormat, lyricsFormat, outputFormat, requestId) => {
+                $.post('/search', { search_query: searchQuery, audio_format: audioFormat, lyrics_format: lyricsFormat, output_format: outputFormat })
+                    .done((data, textStatus, jqXHR) => handleRequestSuccess(data, requestId, searchQuery))
+                    .fail((jqXHR, textStatus, errorThrown) => handleRequestFailure(requestId, searchQuery, errorThrown));
+            };
 
-                                if (downloadButtonExists) {
-                                    requestElement.find('.spinner-border').remove();
-                                    clearInterval(requestElements[uuid]);
-                                } else {
-                                    $.get('/status/' + unique_id, function (data) {
-                                        if (data.status === 'completed') {
-                                            requestElement.find('span').text(search_query + ' (' + data.status + ')');
-                                            var downloadLink = '<a class="btn btn-success" href="' + data.url + '" target="_blank">Download</a>';
-                                            requestElement.append(downloadLink);
-                                            requestElement.find('.spinner-border').remove();
-                                            clearInterval(requestElements[uuid]);
-                                        }
-                                    });
-                                }
-                            }
+            // Handle successful request submission
+            const handleRequestSuccess = (data, requestId, searchQuery) => {
+                incrementDownloadCounter();
+                if (data.status === 'completed') {
+                    updateRequestItem(requestId, searchQuery, data.url);
+                } else {
+                    startStatusCheck(requestId, data.unique_id, searchQuery);
+                }
+            };
 
-                            requestElements[requestId] = setInterval(function () {
-                                checkStatus(requestId, data.unique_id);
-                            }, 10000);
+            // Handle failed request submission
+            const handleRequestFailure = (requestId, searchQuery, errorThrown) => {
+                console.error('Request failed:', errorThrown);
+                const requestElement = $('#' + requestId);
+                requestElement.find('span').text(`${searchQuery} (Error)`);
+                requestElement.find('.spinner-border').remove();
+            };
+
+            // Periodically check the status of the request
+            const startStatusCheck = (requestId, uniqueId, searchQuery) => {
+                requestElements[requestId] = setInterval(() => {
+                    $.get(`/status/${uniqueId}`, (data) => {
+                        if (data.status === 'completed') {
+                            updateRequestItem(requestId, searchQuery, data.url);
+                            clearInterval(requestElements[requestId]);
                         }
-                    })
-                    .fail(function (jqXHR, textStatus, errorThrown) {
-                        // Handle the failure, e.g., display an error message
-                        console.error('Request failed:', textStatus, errorThrown);
-                        var requestElement = $('#' + requestId);
-                        requestElement.find('span').text(search_query + ' (Error)');
-                        requestElement.find('.spinner-border').remove();
                     });
+                }, 10000);
+            };
 
-            }
+            // Update the request item in the UI
+            const updateRequestItem = (requestId, searchQuery, url) => {
+                const requestElement = $('#' + requestId);
+                requestElement.find('span').text(`${searchQuery} (Completed)`);
+                const downloadLink = `<a class="btn btn-success" href="${url}" target="_blank">Download</a>`;
+                requestElement.append(downloadLink);
+                requestElement.find('.spinner-border').remove();
+            };
 
             $("#search-form").submit(function (event) {
                 event.preventDefault();
