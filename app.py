@@ -51,7 +51,7 @@ def validate_input(input_string):
         return validate_song_title(input_string)
 
 # Define valid options for each dropdown
-VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'slider-kz', 'soundcloud', 'bandcamp', 'piped'}
+VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'slider-kz', 'soundcloud', 'bandcamp', 'piped', 'yt-dlp'}
 VALID_LYRICS_PROVIDERS = {'musixmatch', 'genius', 'azlyrics', 'synced'}
 VALID_OUTPUT_FORMATS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'}
 
@@ -73,6 +73,41 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     os.makedirs(download_folder, exist_ok=True)
 
     command = ['spotdl', search_query, '--max-retries', '2', '--audio', audio_format, '--format', output_format, '--output', download_folder, '--threads', '4']
+
+    try:
+        result = subprocess.run(command, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        result = e
+
+    if result.returncode == 0:
+        try:
+            shutil.make_archive(download_folder, 'zip', download_folder)
+        except FileNotFoundError:
+            with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
+                error_file.write("Error downloading song")
+            shutil.make_archive(download_folder, 'zip', download_folder)
+    else:
+        with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
+            error_file.write("Error downloading song")
+        shutil.make_archive(download_folder, 'zip', download_folder)
+
+    shutil.rmtree(download_folder)
+
+    with open(pending_requests_file, 'r') as pending_file:
+        lines = pending_file.readlines()
+    with open(pending_requests_file, 'w') as pending_file:
+        for line in lines:
+            if line.strip() != unique_id:
+                pending_file.write(line)
+
+def run_ytdlp(unique_id, search_query, output_format):
+    with open(pending_requests_file, 'a') as pending_file:
+        pending_file.write(unique_id + '\n')
+
+    download_folder = os.path.join(music_directory, unique_id)
+    os.makedirs(download_folder, exist_ok=True)
+
+    command = ['yt-dlp', search_query, '-f', 'bestaudio', '--extract-audio', '--audio-format', output_format, '-o', os.path.join(download_folder, '%(title)s.%(ext)s')]
 
     try:
         result = subprocess.run(command, check=True, text=True)
@@ -132,7 +167,10 @@ def search():
         return jsonify({'status': 'error', 'message': 'Invalid input provided'}), 400
 
     unique_id = str(uuid.uuid4())
-    thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
+    if 'youtube.com' in search_query or 'youtu.be' in search_query:
+        thread = threading.Thread(target=run_ytdlp, args=(unique_id, search_query, output_format))
+    else:
+        thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
     thread.start()
 
     return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id}), 202

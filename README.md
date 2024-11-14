@@ -7,3 +7,4 @@ You can choose the format, the audio provider and the lyrics provider for the so
 - Choose the format of the audio file
 - Choose the audio provider
 - Choose the lyrics provider
+- Download soundtracks from YouTube using yt-dlp
