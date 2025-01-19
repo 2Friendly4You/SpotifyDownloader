@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template
+from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import os
@@ -14,6 +15,8 @@ import yt_dlp
 import platform
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'  # Change this to a secure secret key
+socketio = SocketIO(app)
 
 # Set music directory based on OS
 if platform.system() == 'Windows':
@@ -93,6 +96,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     if result.returncode == 0:
         try:
             shutil.make_archive(download_folder, 'zip', download_folder)
+            notify_client_download_complete(unique_id, f'https://sddata.codemagie.xyz/music/{unique_id}.zip')
         except FileNotFoundError:
             with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
                 error_file.write("Error downloading song")
@@ -135,6 +139,7 @@ def download_from_youtube(unique_id, url, output_format):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
         shutil.make_archive(download_folder, 'zip', download_folder)
+        notify_client_download_complete(unique_id, f'https://sddata.codemagie.xyz/music/{unique_id}.zip')
     except Exception as e:
         with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
             error_file.write(f"Error downloading: {str(e)}")
@@ -223,10 +228,32 @@ def get_pending_requests():
     except FileNotFoundError:
         return []
 
+def notify_client_download_complete(unique_id, download_url):
+    # Changed from broadcast=True to namespace='/'
+    socketio.emit('download_complete', {
+        'unique_id': unique_id,
+        'url': download_url
+    }, namespace='/')
+
+@socketio.on('connect')
+def handle_connect():
+    # Check for any completed downloads for this client
+    completed_downloads = []
+    for file in os.listdir(music_directory):
+        if file.endswith('.zip'):
+            unique_id = file[:-4]  # Remove .zip extension
+            completed_downloads.append({
+                'unique_id': unique_id,
+                'url': f'https://sddata.codemagie.xyz/music/{unique_id}.zip'
+            })
+    if completed_downloads:
+        # Add namespace here as well
+        emit('download_history', completed_downloads, namespace='/')
+
 if __name__ == '__main__':
     os.makedirs(music_directory, exist_ok=True)
     # create json file if it doesn't exist
     if not os.path.isfile('searches.json'):
         with open('searches.json', 'w') as f:
             json.dump({'total': 0, 'last': ''}, f)
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
