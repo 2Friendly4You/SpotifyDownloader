@@ -40,9 +40,6 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8210237740497045"
         crossorigin="anonymous"></script>
 
-    <!--Bootstrap-->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
@@ -53,6 +50,8 @@
             --primary: #47ff47;
             --secondary: #d0e2d0;
             --accent: #588d58;
+            --input-bg: #ffffff;
+            --border-color: #e0e0e0;
         }
 
         :root[data-theme="dark"] {
@@ -61,68 +60,197 @@
             --primary: #00b800;
             --secondary: #1d2f1d;
             --accent: #72a772;
+            --input-bg: #1a1a1a;
+            --border-color: #333333;
         }
 
-        /* change default website scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
-
-        ::-webkit-scrollbar-track {
-            background: var(--background);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #5f5f5f;
-            border-radius: 10px;
-        }
-
 
         body {
             word-wrap: break-word;
             font-family: 'Roboto', sans-serif;
             color: var(--text);
             background-color: var(--background);
-
-            font-size: larger;
+            font-size: 16px;
+            line-height: 1.6;
+            padding: 20px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        /* list little space at the bottom */
-        li {
-            margin-bottom: 5px;
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 0 15px;
+        }
+
+        h1, h2, h3 {
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        button {
+            background: var(--primary);
+            color: var(--background);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #requests-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        #requests-list li {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--secondary);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-success {
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+        }
+
+        .spinner-border {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text);
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: auto;
+            font-size: 0;  /* Hide any text inside spinner */
+        }
+
+        #clear-history {
+            margin-bottom: 1.5rem;
+            background: #dc3545;
+            width: auto;
+            padding: 0.75rem 1.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .lightMode {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            border-radius: 20%;
-            border-width: 2px;
-            border-style: solid;
-            /* center */
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: var(--background);
             display: flex;
-            justify-content: center;
             align-items: center;
-            /* size */
-            width: 40px;
-            height: 40px;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
 
+        .faq-section {
+            margin-top: 2rem;
+        }
+
+        .faq-section h3 {
+            margin-top: 1.5rem;
+        }
+
+        .faq-section p {
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                font-size: 14px;
+            }
+
+            .container {
+                padding: 0 10px;
+            }
+
+            button {
+                padding: 0.6rem 1.2rem;
+            }
+
+            #requests-list li {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .btn-success {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="container mt-5">
-        <h1 class="mb-4">Spotify Downloader</h1>
+    <div class="container">
+        <h1>Spotify Downloader</h1>
         <form id="search-form">
             <div class="form-group">
                 <label for="search_query">Search for a song or URL</label>
-                <input type="text" class="form-control" id="search_query" placeholder="Enter a song or URL">
+                <input type="text" id="search_query" placeholder="Enter a song or URL">
             </div>
-            <div class="form-row">
-                <div class="form-group col-md-4">
+            <div class="form-grid">
+                <div class="form-group">
                     <label for="audio_format">Audio provider</label>
-                    <select class="form-control" id="audio_format">
+                    <select id="audio_format">
                         <option value="youtube-music">YouTube Music</option>
                         <option value="youtube">YouTube</option>
                         <option value="slider-kz">slider.kz</option>
@@ -131,18 +259,18 @@
                         <option value="piped">Piped</option>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group">
                     <label for="lyrics_format">Lyrics provider</label>
-                    <select class="form-control" id="lyrics_format">
+                    <select id="lyrics_format">
                         <option value="musixmatch">musixmatch</option>
                         <option value="genius">genius</option>
                         <option value="azlyrics">azlyrics</option>
                         <option value="synced">synced</option>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group">
                     <label for="output_format">Output format</label>
-                    <select class="form-control" id="output_format">
+                    <select id="output_format">
                         <option value="mp3">MP3</option>
                         <option value="m4a">M4A</option>
                         <option value="wav">WAV</option>
@@ -151,14 +279,16 @@
                         <option value="opus">OPUS</option>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
-                    <button type="button" class="btn btn-primary" id="download-button">Search</button>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="button" id="download-button">Search</button>
                 </div>
             </div>
         </form>
 
         <div class="mt-3">
             <h2>Requests</h2>
+            <button class="btn btn-danger mb-2" id="clear-history">Clear History</button>
             <ul id="requests-list">
                 <!-- Requests will be added here dynamically -->
             </ul>
@@ -167,7 +297,7 @@
         <h3>Download counter</h3>
         <span><span id="downloadCounter"></span> Songs/ Playlists were already downloaded</p>
             <br>
-            <div>
+            <div class="faq-section">
                 <h3>FAQ</h3>
                 <p><b>How do I download songs?</b></p>
                 <p>Enter a song title or URL and press Search. Once the song is found, click Download.</p>
@@ -209,7 +339,6 @@
         </span>
     </button>
 
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function () {
@@ -217,9 +346,40 @@
             const socket = io();
             const pendingDownloads = new Map();
 
+            // Load downloads from local storage
+            const loadDownloadHistory = () => {
+                const downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+                downloads.forEach(item => {
+                    // Check if file still exists on server
+                    $.ajax({
+                        url: `/status/${item.unique_id}`,
+                        method: 'GET',
+                        success: function(response) {
+                            if (response.status === 'completed') {
+                                updateRequestItem(item.unique_id, item.searchQuery, response.url);
+                            }
+                        }
+                    });
+                });
+            };
+
+            // Save download to local storage
+            const saveDownload = (unique_id, searchQuery, url) => {
+                const downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+                downloads.push({ unique_id, searchQuery, url });
+                localStorage.setItem('downloads', JSON.stringify(downloads));
+            };
+
+            // Clear download history
+            $("#clear-history").click(function() {
+                localStorage.removeItem('downloads');
+                $("#requests-list").empty();
+            });
+
             // Socket.IO event handlers
             socket.on('connect', function() {
                 console.log('Connected to server');
+                loadDownloadHistory();
             });
 
             socket.on('download_complete', function(data) {
@@ -227,6 +387,7 @@
                 if (pendingDownloads.has(data.unique_id)) {
                     const searchQuery = pendingDownloads.get(data.unique_id);
                     updateRequestItem(data.unique_id, searchQuery, data.url);
+                    saveDownload(data.unique_id, searchQuery, data.url);
                     pendingDownloads.delete(data.unique_id);
                 }
             });
@@ -297,7 +458,7 @@
                         pendingDownloads.set(data.unique_id, searchQuery);
                         
                         // Add to UI
-                        const requestItem = `<li id="${data.unique_id}"><span>${searchQuery} (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>`;
+                        const requestItem = `<li id="${data.unique_id}"><span>${searchQuery} (Pending)</span> <div class="spinner-border" role="status"></div></li>`;
                         $("#requests-list").append(requestItem);
                         
                         incrementDownloadCounter();
@@ -318,11 +479,16 @@
 
             // Update the request item in the UI
             const updateRequestItem = (requestId, searchQuery, url) => {
-                const requestElement = $(`#${requestId}`);
-                if (requestElement.length) {
-                    requestElement.find('span').text(`${searchQuery} (Completed)`);
-                    requestElement.find('.spinner-border').remove();
-                    requestElement.append(`<a class="btn btn-success ml-2" href="${url}" target="_blank">Download</a>`);
+                const existingItem = $(`#${requestId}`);
+                if (existingItem.length) {
+                    existingItem.find('span').text(`${searchQuery} (Completed)`);
+                    existingItem.find('.spinner-border').remove();
+                    if (!existingItem.find('.btn-success').length) {
+                        existingItem.append(`<a class="btn btn-success ml-2" href="${url}" target="_blank">Download</a>`);
+                    }
+                } else {
+                    const requestItem = `<li id="${requestId}"><span>${searchQuery} (Completed)</span> <a class="btn btn-success ml-2" href="${url}" target="_blank">Download</a></li>`;
+                    $("#requests-list").append(requestItem);
                 }
             };
 
