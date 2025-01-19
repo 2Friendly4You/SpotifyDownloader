@@ -10,16 +10,22 @@ import time
 import json
 from urllib.parse import urlparse
 import re
+import yt_dlp
+import platform
 
 app = Flask(__name__)
-music_directory = "/var/www/SpotifyDownloader/"
 
-uri = 'memcached://localhost:11211'  # URI to the storage backend
+# Set music directory based on OS
+if platform.system() == 'Windows':
+    music_directory = "C:/SpotifyDownloader/music/"
+else:
+    music_directory = "/var/www/SpotifyDownloader/"
 
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    storage_uri=uri,
+    storage_uri="memory:///rate_limits.db",
+    default_limits=["200 per day", "50 per hour"]
 )
 
 pending_requests_file = 'pending_requests.txt'
@@ -39,6 +45,11 @@ def validate_spotify_url(input_url):
     return parsed_url.scheme in ['http', 'https'] and \
            parsed_url.netloc == 'open.spotify.com'
 
+def is_youtube_url(url):
+    """Check if the URL is a valid YouTube URL."""
+    youtube_regex = r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$'
+    return bool(re.match(youtube_regex, url))
+
 def validate_song_title(title):
     """Basic validation for song titles."""
     return bool(re.match(r"^[a-zA-Z0-9\s\-'.,!&?=-]+$", title))
@@ -46,12 +57,12 @@ def validate_song_title(title):
 def validate_input(input_string):
     """Determine if input is a Spotify URL or song title, then validate accordingly."""
     if is_valid_url(input_string):
-        return validate_spotify_url(input_string)
+        return validate_spotify_url(input_string) or is_youtube_url(input_string)
     else:
         return validate_song_title(input_string)
 
 # Define valid options for each dropdown
-VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'slider-kz', 'soundcloud', 'bandcamp', 'piped'}
+VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'slider-kz', 'soundcloud', 'bandcamp', 'piped', 'yt-dlp'}
 VALID_LYRICS_PROVIDERS = {'musixmatch', 'genius', 'azlyrics', 'synced'}
 VALID_OUTPUT_FORMATS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'}
 
@@ -100,6 +111,37 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             if line.strip() != unique_id:
                 pending_file.write(line)
 
+def download_from_youtube(unique_id, url, output_format):
+    download_folder = os.path.join(music_directory, unique_id)
+    os.makedirs(download_folder, exist_ok=True)
+    output_template = os.path.join(download_folder, '%(title)s.%(ext)s')
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': output_format,
+            'preferredquality': '320',
+        }, {
+            'key': 'FFmpegMetadata',
+            'add_metadata': True,
+        }],
+        'outtmpl': output_template,
+        'writethumbnail': True,
+        'embedthumbnail': True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        shutil.make_archive(download_folder, 'zip', download_folder)
+    except Exception as e:
+        with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
+            error_file.write(f"Error downloading: {str(e)}")
+        shutil.make_archive(download_folder, 'zip', download_folder)
+    finally:
+        shutil.rmtree(download_folder)
+
 @app.route('/')
 def index():
     return render_template('index.html', pending_requests=get_pending_requests()), 200
@@ -125,17 +167,26 @@ def search():
         return jsonify({'status': 'error', 'message': 'Search query is required'}), 400
 
     # validate search query and form data and send 400 bad request if invalid
-    if not validate_input(search_query) or \
-       not validate_audio_provider(audio_format) or \
-       not validate_lyrics_provider(lyrics_format) or \
-       not validate_output_format(output_format):
-        return jsonify({'status': 'error', 'message': 'Invalid input provided'}), 400
+    if is_youtube_url(search_query):
+        if not output_format or not output_format in VALID_OUTPUT_FORMATS:
+            return jsonify({'status': 'error', 'message': 'Invalid output format'}), 400
+    else:
+        if not validate_input(search_query) or \
+           not validate_audio_provider(audio_format) or \
+           not validate_lyrics_provider(lyrics_format) or \
+           not validate_output_format(output_format):
+            return jsonify({'status': 'error', 'message': 'Invalid input provided'}), 400
 
     unique_id = str(uuid.uuid4())
-    thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
+
+    if is_youtube_url(search_query):
+        thread = threading.Thread(target=download_from_youtube, args=(unique_id, search_query, output_format))
+    else:
+        thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
+    
     thread.start()
 
-    return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id}), 202
+    return jsonify({'status': 'success', 'message': 'Download started', 'unique_id': unique_id}), 202
 
 @app.route('/download_counter', methods=['GET'])
 def download_counter():

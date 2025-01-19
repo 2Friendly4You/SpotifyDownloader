@@ -241,11 +241,11 @@
                 const lyricsFormat = $("#lyrics_format").val().trim();
                 const outputFormat = $("#output_format").val().trim();
 
-                if (!searchQuery || !audioFormat || !lyricsFormat || !outputFormat) {
+                if (!searchQuery || !outputFormat) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Please provide a search query and select all options!',
+                        text: 'Please provide a search query and select an output format!',
                     });
                     return;
                 }
@@ -330,7 +330,38 @@
                     $("#search_query").val('');
                 }
             });
+
+            // Add event listener for search query input
+            $("#search_query").on('input', function() {
+                updateProviders($(this).val());
+            });
         });
+
+        function updateProviders(searchQuery) {
+            const isYouTubeUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/.test(searchQuery);
+            const audioFormatSelect = $("#audio_format");
+            const lyricsFormatSelect = $("#lyrics_format");
+            const outputFormatSelect = $("#output_format");
+            
+            if (isYouTubeUrl) {
+                audioFormatSelect.html('<option value="yt-dlp">YouTube Downloader</option>');
+                audioFormatSelect.prop('disabled', true);
+                lyricsFormatSelect.prop('disabled', true);
+                outputFormatSelect.prop('disabled', false);
+            } else {
+                audioFormatSelect.html(`
+                    <option value="youtube-music">YouTube Music</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="slider-kz">slider.kz</option>
+                    <option value="soundcloud">SoundCloud</option>
+                    <option value="bandcamp">Bandcamp</option>
+                    <option value="piped">Piped</option>
+                `);
+                audioFormatSelect.prop('disabled', false);
+                lyricsFormatSelect.prop('disabled', false);
+                outputFormatSelect.prop('disabled', false);
+            }
+        }
     </script>
     <script>
         function setCookie(cname, cvalue, exdays) {
