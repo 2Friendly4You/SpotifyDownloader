@@ -44,6 +44,7 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
     <style>
         :root[data-theme="light"] {
@@ -213,7 +214,33 @@
     <script>
         $(document).ready(function () {
             let requestIdCounter = 0;
-            const requestElements = {};
+            const socket = io();
+            const pendingDownloads = new Map();
+
+            // Socket.IO event handlers
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
+
+            socket.on('download_complete', function(data) {
+                console.log('Download complete:', data);
+                if (pendingDownloads.has(data.unique_id)) {
+                    const searchQuery = pendingDownloads.get(data.unique_id);
+                    updateRequestItem(data.unique_id, searchQuery, data.url);
+                    pendingDownloads.delete(data.unique_id);
+                }
+            });
+
+            socket.on('download_history', function(downloads) {
+                console.log('Download history:', downloads);
+                downloads.forEach(download => {
+                    if (pendingDownloads.has(download.unique_id)) {
+                        const searchQuery = pendingDownloads.get(download.unique_id);
+                        updateRequestItem(download.unique_id, searchQuery, download.url);
+                        pendingDownloads.delete(download.unique_id);
+                    }
+                });
+            });
 
             // Utility function to display alerts
             const showAlert = async (title, text, cookieName) => {
@@ -241,11 +268,11 @@
                 const lyricsFormat = $("#lyrics_format").val().trim();
                 const outputFormat = $("#output_format").val().trim();
 
-                if (!searchQuery || !audioFormat || !lyricsFormat || !outputFormat) {
+                if (!searchQuery || !outputFormat) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Please provide a search query and select all options!',
+                        text: 'Please provide a search query and select an output format!',
                     });
                     return;
                 }
@@ -256,81 +283,97 @@
                     await showAlert('Info...', 'Search queries are often very imprecise. Please use links if you want to get accurate results.', "trackNotification");
                 }
 
-                const requestId = `request_${requestIdCounter++}`;
-                const requestItem = `<li id="${requestId}"><span>${searchQuery} (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>`;
-                $("#requests-list").append(requestItem);
-
-                submitDownloadRequest(searchQuery, audioFormat, lyricsFormat, outputFormat, requestId);
-            };
-
-            // Submit the download request
-            const submitDownloadRequest = (searchQuery, audioFormat, lyricsFormat, outputFormat, requestId) => {
-                $.post('/search', { search_query: searchQuery, audio_format: audioFormat, lyrics_format: lyricsFormat, output_format: outputFormat })
-                    .done((data, textStatus, jqXHR) => handleRequestSuccess(data, requestId, searchQuery))
-                    .fail((jqXHR, textStatus, errorThrown) => handleRequestFailure(requestId, searchQuery, errorThrown));
-            };
-
-            // Handle successful request submission
-            const handleRequestSuccess = (data, requestId, searchQuery) => {
-                incrementDownloadCounter();
-                if (data.status === 'completed') {
-                    updateRequestItem(requestId, searchQuery, data.url);
-                } else {
-                    startStatusCheck(requestId, data.unique_id, searchQuery);
-                }
-            };
-
-            // Handle failed request submission
-            const handleRequestFailure = (requestId, searchQuery, errorThrown) => {
-                console.error('Request failed:', errorThrown);
-                const requestElement = $('#' + requestId);
-                requestElement.find('span').text(`${searchQuery} (Error)`);
-                requestElement.find('.spinner-border').remove();
-            };
-
-            // Periodically check the status of the request
-            const startStatusCheck = (requestId, uniqueId, searchQuery) => {
-                requestElements[requestId] = setInterval(() => {
-                    $.get(`/status/${uniqueId}`, (data) => {
-                        if (data.status === 'completed') {
-                            updateRequestItem(requestId, searchQuery, data.url);
-                            clearInterval(requestElements[requestId]);
-                        }
+                // Submit the download request
+                $.post('/search', {
+                    search_query: searchQuery,
+                    audio_format: audioFormat,
+                    lyrics_format: lyricsFormat,
+                    output_format: outputFormat
+                })
+                .done(function(data) {
+                    console.log('Search response:', data);
+                    if (data.status === 'success' && data.unique_id) {
+                        // Add to pending downloads
+                        pendingDownloads.set(data.unique_id, searchQuery);
+                        
+                        // Add to UI
+                        const requestItem = `<li id="${data.unique_id}"><span>${searchQuery} (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>`;
+                        $("#requests-list").append(requestItem);
+                        
+                        incrementDownloadCounter();
+                    }
+                })
+                .fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error('Request failed:', errorThrown);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Failed to start download. Please try again.',
                     });
-                }, 10000);
+                });
+
+                // Clear input after submission
+                $("#search_query").val('');
             };
 
             // Update the request item in the UI
             const updateRequestItem = (requestId, searchQuery, url) => {
-                const requestElement = $('#' + requestId);
-                requestElement.find('span').text(`${searchQuery} (Completed)`);
-                const downloadLink = `<a class="btn btn-success" href="${url}" target="_blank">Download</a>`;
-                requestElement.append(downloadLink);
-                requestElement.find('.spinner-border').remove();
+                const requestElement = $(`#${requestId}`);
+                if (requestElement.length) {
+                    requestElement.find('span').text(`${searchQuery} (Completed)`);
+                    requestElement.find('.spinner-border').remove();
+                    requestElement.append(`<a class="btn btn-success ml-2" href="${url}" target="_blank">Download</a>`);
+                }
             };
 
+            // Event handlers for form submission
             $("#search-form").submit(function (event) {
                 event.preventDefault();
                 initiateDownload();
-                // clear input
-                $("#search_query").val('');
             });
 
             $("#download-button").click(function () {
                 initiateDownload();
-                // clear input
-                $("#search_query").val('');
             });
 
             $("#search_query").keypress(function (e) {
                 if (e.which === 13) {
                     e.preventDefault();
                     initiateDownload();
-                    // clear input
-                    $("#search_query").val('');
                 }
             });
+
+            // Add event listener for search query input
+            $("#search_query").on('input', function() {
+                updateProviders($(this).val());
+            });
         });
+
+        function updateProviders(searchQuery) {
+            const isYouTubeUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/.test(searchQuery);
+            const audioFormatSelect = $("#audio_format");
+            const lyricsFormatSelect = $("#lyrics_format");
+            const outputFormatSelect = $("#output_format");
+            
+            if (isYouTubeUrl) {
+                audioFormatSelect.html('<option value="yt-dlp">YouTube Downloader</option>');
+                audioFormatSelect.prop('disabled', true);
+                lyricsFormatSelect.prop('disabled', true);
+                outputFormatSelect.prop('disabled', false);
+            } else {
+                audioFormatSelect.html(`
+                    <option value="youtube-music">YouTube Music</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="slider-kz">slider.kz</option>
+                    <option value="soundcloud">SoundCloud</option>
+                    <option value="bandcamp">Bandcamp</option>
+                    <option value="piped">Piped</option>
+                `);
+                audioFormatSelect.prop('disabled', false);
+                lyricsFormatSelect.prop('disabled', false);
+                outputFormatSelect.prop('disabled', false);
+            }
+        }
     </script>
     <script>
         function setCookie(cname, cvalue, exdays) {

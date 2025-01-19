@@ -5,7 +5,7 @@ APP_NAME="SpotifyDownloader"
 COMMANDLINE_PARAMETERS="" # Add any additional parameters for your app here.
 PID_FILE="./$APP_NAME.pid"
 LOG_FILE="./$APP_NAME.log"
-APP_COMMAND="gunicorn --bind 192.168.0.246:8900 --workers 8 app:app"
+APP_COMMAND="gunicorn --worker-class eventlet --bind 192.168.0.246:8900 --workers 1 app:app"
 
 # Function to start the app
 do_start() {
