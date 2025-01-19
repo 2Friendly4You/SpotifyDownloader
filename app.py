@@ -129,15 +129,27 @@ def download_from_youtube(unique_id, url, output_format):
         }, {
             'key': 'FFmpegMetadata',
             'add_metadata': True,
+        }, {
+            'key': 'EmbedThumbnail',  # Add this postprocessor to handle thumbnails
         }],
         'outtmpl': output_template,
         'writethumbnail': True,
         'embedthumbnail': True,
+        'postprocessor_args': [
+            '-write_id3v1', '1',
+            '-id3v2_version', '3',
+        ],
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+            
+        # Clean up any leftover thumbnail files
+        for file in os.listdir(download_folder):
+            if file.endswith(('.webp', '.jpg', '.png')):
+                os.remove(os.path.join(download_folder, file))
+                
         shutil.make_archive(download_folder, 'zip', download_folder)
         notify_client_download_complete(unique_id, f'https://sddata.codemagie.xyz/music/{unique_id}.zip')
     except Exception as e:
