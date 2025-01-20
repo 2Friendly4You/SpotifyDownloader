@@ -13,10 +13,14 @@ from urllib.parse import urlparse
 import re
 import yt_dlp
 import platform
+import redis
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'  # Change this to a secure secret key
 socketio = SocketIO(app)
+
+# Redis connection
+redis_client = redis.Redis(host='spotifydownloader-redis', port=6379, db=0)
 
 # Set music directory based on OS
 if platform.system() == 'Windows':
@@ -31,7 +35,8 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
-pending_requests_file = 'pending_requests.txt'
+# Update file path to be absolute
+pending_requests_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pending_requests.txt')
 
 
 def is_valid_url(input_url):
@@ -80,9 +85,9 @@ def validate_output_format(selection):
 
 
 def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
-    with open(pending_requests_file, 'a') as pending_file:
-        pending_file.write(unique_id + '\n')
-
+    # Add to pending requests with 1 hour expiry
+    redis_client.setex(f"pending:{unique_id}", 3600, "1")
+    
     download_folder = os.path.join(music_directory, unique_id)
     os.makedirs(download_folder, exist_ok=True)
 
@@ -96,7 +101,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     if result.returncode == 0:
         try:
             shutil.make_archive(download_folder, 'zip', download_folder)
-            notify_client_download_complete(unique_id, f'https://sddata.codemagie.xyz/music/{unique_id}.zip')
+            notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
         except FileNotFoundError:
             with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
                 error_file.write("Error downloading song")
@@ -108,12 +113,8 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
 
     shutil.rmtree(download_folder)
 
-    with open(pending_requests_file, 'r') as pending_file:
-        lines = pending_file.readlines()
-    with open(pending_requests_file, 'w') as pending_file:
-        for line in lines:
-            if line.strip() != unique_id:
-                pending_file.write(line)
+    # Remove from pending requests
+    redis_client.delete(f"pending:{unique_id}")
 
 def download_from_youtube(unique_id, url, output_format):
     download_folder = os.path.join(music_directory, unique_id)
@@ -151,7 +152,7 @@ def download_from_youtube(unique_id, url, output_format):
                 os.remove(os.path.join(download_folder, file))
                 
         shutil.make_archive(download_folder, 'zip', download_folder)
-        notify_client_download_complete(unique_id, f'https://sddata.codemagie.xyz/music/{unique_id}.zip')
+        notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
     except Exception as e:
         with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
             error_file.write(f"Error downloading: {str(e)}")
@@ -221,7 +222,7 @@ def check_request(unique_id):
     else:
         # Check if the file exists
         if os.path.isfile(os.path.join(music_directory, unique_id + ".zip")):
-            return jsonify({'status': 'completed', 'url': 'https://sddata.codemagie.xyz/music/' + unique_id + '.zip'}), 200
+            return jsonify({'status': 'completed', 'url': f'/music/{unique_id}.zip'}), 200
         else:
             return jsonify({'status': 'error', 'message': 'File not found'}), 404
 
@@ -234,11 +235,8 @@ def delete_file(download_file):
         pass
 
 def get_pending_requests():
-    try:
-        with open(pending_requests_file, 'r') as pending_file:
-            return [line.strip() for line in pending_file.readlines()]
-    except FileNotFoundError:
-        return []
+    pending_keys = redis_client.keys("pending:*")
+    return [key.decode('utf-8').split(':')[1] for key in pending_keys]
 
 def notify_client_download_complete(unique_id, download_url):
     # Changed from broadcast=True to namespace='/'
@@ -264,8 +262,15 @@ def handle_connect():
 
 if __name__ == '__main__':
     os.makedirs(music_directory, exist_ok=True)
+    
+    # Ensure pending_requests.txt exists and is a file
+    if not os.path.isfile(pending_requests_file):
+        with open(pending_requests_file, 'w') as f:
+            f.write('')
+            
     # create json file if it doesn't exist
     if not os.path.isfile('searches.json'):
         with open('searches.json', 'w') as f:
             json.dump({'total': 0, 'last': ''}, f)
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    # Remove direct socketio.run call since we're using Gunicorn
+    app.run(host='0.0.0.0', port=5000, debug=False)
