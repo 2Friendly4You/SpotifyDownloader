@@ -1,0 +1,42 @@
+services:
+  spotifydownloader-app:
+    build: .
+    container_name: spotifydownloader-app
+    expose:
+      - "5000"
+    depends_on:
+      - spotifydownloader-data
+      - spotifydownloader-redis
+    volumes_from:
+      - spotifydownloader-data
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+    restart: unless-stopped
+
+  spotifydownloader-nginx:
+    image: nginx:alpine
+    container_name: spotifydownloader-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - spotifydownloader-app
+      - spotifydownloader-data
+    volumes_from:
+      - spotifydownloader-data
+    restart: unless-stopped
+
+  spotifydownloader-data:
+    image: alpine:latest
+    container_name: spotifydownloader-data
+    volumes:
+      - ./music:/var/www/SpotifyDownloader
+      - ./searches.json:/app/searches.json
+    command: tail -f /dev/null
+
+  spotifydownloader-redis:
+    image: redis:alpine
+    container_name: spotifydownloader-redis
+    restart: unless-stopped

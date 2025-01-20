@@ -1,0 +1,8 @@
+flask==3.0.3
+flask-socketio==5.5.1
+flask-limiter==3.10.1
+yt-dlp==2025.1.15
+spotdl==4.2.11
+gunicorn==23.0.0
+gevent==24.11.1
+gevent-websocket==0.10.1
