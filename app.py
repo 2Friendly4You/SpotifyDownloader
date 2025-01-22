@@ -22,7 +22,14 @@ from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
+socketio = SocketIO(app, 
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25
+)
 redis_client = redis.Redis(host='spotifydownloader-redis', port=6379, db=0)
 
 # Configure rate limiting
@@ -322,4 +329,4 @@ if __name__ == '__main__':
         with open('searches.json', 'w') as f:
             json.dump({'total': 0, 'last': ''}, f)
 
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)

@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and install Python packages
-COPY requirements.txt .
+COPY requirements.txt . 
+RUN python -m pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
@@ -24,6 +25,6 @@ ENV FLASK_APP=app.py
 
 EXPOSE 5000
 
-# Use Gunicorn with gevent-websocket worker
-CMD ["gunicorn", "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", \
+# Update the CMD to use eventlet worker
+CMD ["gunicorn", "--worker-class", "eventlet", \
      "--workers", "1", "--bind", "0.0.0.0:5000", "wsgi:app"]
