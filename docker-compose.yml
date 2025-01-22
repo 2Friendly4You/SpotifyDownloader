@@ -33,6 +33,7 @@ services:
     container_name: spotifydownloader-data
     volumes:
       - ./music:/var/www/SpotifyDownloader
+      - ./images:/var/www/images
       - ./searches.json:/app/searches.json
     command: tail -f /dev/null
 
