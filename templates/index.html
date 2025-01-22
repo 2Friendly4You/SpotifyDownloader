@@ -189,33 +189,50 @@
             to { transform: rotate(360deg); }
         }
 
-        .lightMode {
+        .theme-switch {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: var(--accent);
-            color: var(--background);
+            background: var(--secondary);
+            border-radius: 50px;
+            padding: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 2px solid var(--accent);
+            transition: all 0.3s ease;
+        }
+
+        .theme-switch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .theme-switch .icon {
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            color: var(--text);
         }
 
-        .faq-section {
-            margin-top: 2rem;
+        .theme-switch .sun {
+            display: none;
         }
 
-        .faq-section h3 {
-            margin-top: 1.5rem;
+        .theme-switch .moon {
+            display: flex;
         }
 
-        .faq-section p {
-            margin-bottom: 1rem;
+        [data-theme="light"] .theme-switch .sun {
+            display: flex;
+        }
+
+        [data-theme="light"] .theme-switch .moon {
+            display: none;
         }
 
         @media (max-width: 768px) {
@@ -239,6 +256,12 @@
 
             .btn-success {
                 width: auto; /* Override the full width on mobile */
+            }
+
+            .theme-switch {
+                bottom: 15px;
+                right: 15px;
+                padding: 8px;
             }
         }
 
@@ -412,9 +435,12 @@
     </div>
     <br><br>
     <div class="notification-container"></div>
-    <button class="lightMode" onclick="changeLightMode()">
-        <span class="material-symbols-outlined">
-            settings_brightness
+    <button class="theme-switch" onclick="changeLightMode()" aria-label="Toggle theme">
+        <span class="icon sun">
+            <span class="material-symbols-outlined">light_mode</span>
+        </span>
+        <span class="icon moon">
+            <span class="material-symbols-outlined">dark_mode</span>
         </span>
     </button>
 
@@ -653,21 +679,22 @@
     <script>
         // save to local storage
         function changeLightMode() {
-            if (localStorage.getItem("lightMode") == "true") {
-                localStorage.setItem("lightMode", "false");
-            } else {
-                localStorage.setItem("lightMode", "true");
-            }
+            const isDark = localStorage.getItem("lightMode") !== "true";
+            localStorage.setItem("lightMode", isDark ? "true" : "false");
             setLightMode();
+            
+            // Add smooth transition animation
+            document.documentElement.style.transition = 'all 0.3s ease';
+            setTimeout(() => {
+                document.documentElement.style.transition = '';
+            }, 300);
         }
 
         // load from local storage
         function setLightMode() {
-            if (localStorage.getItem("lightMode") == "true") {
-                document.documentElement.setAttribute('data-theme', 'light');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
+            document.documentElement.setAttribute('data-theme', 
+                localStorage.getItem("lightMode") === "true" ? "light" : "dark"
+            );
         }
 
         // check if light mode is set
