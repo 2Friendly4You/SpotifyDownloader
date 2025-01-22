@@ -101,6 +101,7 @@ button {
     border-radius: 6px;
     display: inline-block;
     min-width: 100px;
+    word-wrap: normal;
 }
 
 button:hover {
