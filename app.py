@@ -43,8 +43,7 @@ redis_client = redis.Redis(host='spotifydownloader-redis', port=6379, db=0)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    storage_uri="memory:///rate_limits.db",
-    default_limits=["200 per day", "50 per hour"]
+    storage_uri="memory:///rate_limits.db"
 )
 
 # Configure paths and constants
@@ -137,6 +136,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
 
 
 def download_from_youtube(unique_id, url, output_format):
+    redis_client.setex(f"pending:{unique_id}", 3600, "1")
     download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
 
@@ -184,6 +184,7 @@ def download_from_youtube(unique_id, url, output_format):
 
     finally:
         shutil.rmtree(download_folder)
+        redis_client.delete(f"pending:{unique_id}")
 
 # ===============================
 # Route Handlers
