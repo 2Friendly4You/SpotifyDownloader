@@ -41,3 +41,17 @@ services:
     image: redis:alpine
     container_name: spotifydownloader-redis
     restart: unless-stopped
+
+  spotifydownloader-cleanup:
+    build:
+      context: .
+      dockerfile: Dockerfile.cleanup
+    container_name: spotifydownloader-cleanup
+    volumes_from:
+      - spotifydownloader-data
+    environment:
+      - RETENTION_DAYS=14  # Set retention period in days
+      - CLEANUP_INTERVAL=86400  # Cleanup check interval in seconds (default: 24h)
+    depends_on:
+      - spotifydownloader-data
+    restart: unless-stopped
