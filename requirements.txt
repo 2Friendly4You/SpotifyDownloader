@@ -6,3 +6,4 @@ spotdl==4.2.11
 gunicorn==23.0.0
 gevent==24.11.1
 gevent-websocket==0.10.1
+redis==5.2.1

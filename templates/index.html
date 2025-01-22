@@ -7,19 +7,19 @@
 
     <meta name="description"
         content="Effortlessly download your favorite Spotify songs and playlists with our Spotify Downloader. High-quality audio, multiple formats, and easy-to-use interface. Try now!">
-    <meta name="msapplication-TileImage" content="https://sddata.codemagie.xyz/SpotifyDownloader.png">
+    <meta name="msapplication-TileImage" content="/images/SpotifyDownloader.png">
     <meta property="og:site_name" content="Spotify Downloader">
     <meta property="og:title" content="Spotify Downloader">
     <meta property="og:description"
         content="Effortlessly download your favorite Spotify songs and playlists with our Spotify Downloader. High-quality audio, multiple formats, and easy-to-use interface. Try now!">
-    <meta property="og:image" itemprop="image" content="https://sddata.codemagie.xyz/SpotifyDownloader.png">
+    <meta property="og:image" itemprop="image" content="/images/SpotifyDownloader.png">
     <meta property="og:type" content="website" />
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="300">
     <meta property="og:image:height" content="300">
     <meta property="og:url" content="https://sd.codemagie.xyz/">
-    <link rel="icon" href="https://sddata.codemagie.xyz/SpotifyDownloader.png" type="image/png">
-    <link rel="apple-touch-icon" sizes="300x300" href="https://sddata.codemagie.xyz/SpotifyDownloader.png">
+    <link rel="icon" href="/images/SpotifyDownloader.png" type="image/png">
+    <link rel="apple-touch-icon" sizes="300x300" href="/images/SpotifyDownloader.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
@@ -40,7 +40,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8210237740497045"
         crossorigin="anonymous"></script>
 
-    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
     <style>
@@ -131,7 +131,21 @@
             font-size: 1rem;
             cursor: pointer;
             transition: opacity 0.2s;
+        }
+
+        /* Remove width: 100% from default button style and add it specifically where needed */
+        .full-width {
             width: 100%;
+        }
+
+        .btn-success {
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            display: inline-block; /* Change from block to inline-block */
+            min-width: 100px; /* Set a minimum width */
         }
 
         button:hover {
@@ -146,19 +160,12 @@
         #requests-list li {
             display: flex;
             align-items: center;
+            justify-content: space-between; /* Better spacing control */
             gap: 1rem;
             padding: 1rem;
             background: var(--secondary);
             border-radius: 8px;
             margin-bottom: 0.5rem;
-        }
-
-        .btn-success {
-            background: var(--accent);
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
         }
 
         .spinner-border {
@@ -168,8 +175,9 @@
             border-right-color: transparent;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            margin-left: auto;
             font-size: 0;  /* Hide any text inside spinner */
+            flex-shrink: 0; /* Prevent spinner from being squished */
+            margin: 0 0 0 auto; /* Fix margin alignment */
         }
 
         #clear-history {
@@ -232,8 +240,7 @@
             }
 
             .btn-success {
-                width: 100%;
-                text-align: center;
+                width: auto; /* Override the full width on mobile */
             }
         }
     </style>
@@ -281,7 +288,7 @@
                 </div>
                 <div class="form-group">
                     <label>&nbsp;</label>
-                    <button type="button" id="download-button">Search</button>
+                    <button type="button" id="download-button" class="full-width">Search</button>
                 </div>
             </div>
         </form>
@@ -343,36 +350,42 @@
     <script>
         $(document).ready(function () {
             let requestIdCounter = 0;
-            const socket = io();
+            const socket = io({
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                reconnectionAttempts: Infinity
+            });
             const pendingDownloads = new Map();
 
-            // Load downloads from local storage
+            // Load only user's downloads from local storage
             const loadDownloadHistory = () => {
-                const downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
-                downloads.forEach(item => {
-                    // Check if file still exists on server
-                    $.ajax({
-                        url: `/status/${item.unique_id}`,
-                        method: 'GET',
-                        success: function(response) {
-                            if (response.status === 'completed') {
-                                updateRequestItem(item.unique_id, item.searchQuery, response.url);
-                            }
-                        }
-                    });
+                const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+                userDownloads.forEach(item => {
+                    // Add to pending downloads map
+                    pendingDownloads.set(item.unique_id, item.searchQuery);
+                    
+                    // Add to UI as pending
+                    const requestItem = `<li id="${item.unique_id}">
+                        <span>${item.searchQuery} (Checking status...)</span>
+                        <div class="spinner-border" role="status"></div>
+                    </li>`;
+                    $("#requests-list").append(requestItem);
                 });
             };
 
-            // Save download to local storage
+            // Save download to user's storage
             const saveDownload = (unique_id, searchQuery, url) => {
-                const downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
-                downloads.push({ unique_id, searchQuery, url });
-                localStorage.setItem('downloads', JSON.stringify(downloads));
+                const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+                // Remove any existing entry for this unique_id
+                const filteredDownloads = userDownloads.filter(d => d.unique_id !== unique_id);
+                filteredDownloads.push({ unique_id, searchQuery, url });
+                localStorage.setItem('userDownloads', JSON.stringify(filteredDownloads));
             };
 
-            // Clear download history
+            // Clear user's download history
             $("#clear-history").click(function() {
-                localStorage.removeItem('downloads');
+                localStorage.removeItem('userDownloads');
                 $("#requests-list").empty();
             });
 
@@ -384,6 +397,7 @@
 
             socket.on('download_complete', function(data) {
                 console.log('Download complete:', data);
+                // Only process if it's in our pending downloads
                 if (pendingDownloads.has(data.unique_id)) {
                     const searchQuery = pendingDownloads.get(data.unique_id);
                     updateRequestItem(data.unique_id, searchQuery, data.url);
@@ -392,15 +406,37 @@
                 }
             });
 
-            socket.on('download_history', function(downloads) {
-                console.log('Download history:', downloads);
-                downloads.forEach(download => {
-                    if (pendingDownloads.has(download.unique_id)) {
-                        const searchQuery = pendingDownloads.get(download.unique_id);
-                        updateRequestItem(download.unique_id, searchQuery, download.url);
-                        pendingDownloads.delete(download.unique_id);
+            socket.on('download_status', function(data) {
+                const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+                const userDownloadIds = new Set(userDownloads.map(d => d.unique_id));
+
+                // Only handle downloads that belong to this user
+                data.completed.forEach(download => {
+                    if (userDownloadIds.has(download.unique_id)) {
+                        updateRequestItem(download.unique_id, 
+                                       pendingDownloads.get(download.unique_id), 
+                                       download.url);
                     }
                 });
+
+                data.pending.forEach(download => {
+                    if (userDownloadIds.has(download.unique_id)) {
+                        const existingItem = $(`#${download.unique_id}`);
+                        if (existingItem.length && !existingItem.find('.spinner-border').length) {
+                            existingItem.find('span').text(`${pendingDownloads.get(download.unique_id)} (Pending)`);
+                            existingItem.append('<div class="spinner-border" role="status"></div>');
+                        }
+                    }
+                });
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server, attempting to reconnect...');
+            });
+
+            socket.on('reconnect', function() {
+                console.log('Reconnected to server');
+                // Server will send updated status on reconnection
             });
 
             // Utility function to display alerts
@@ -456,6 +492,7 @@
                     if (data.status === 'success' && data.unique_id) {
                         // Add to pending downloads
                         pendingDownloads.set(data.unique_id, searchQuery);
+                        saveDownload(data.unique_id, searchQuery); // Save immediately
                         
                         // Add to UI
                         const requestItem = `<li id="${data.unique_id}"><span>${searchQuery} (Pending)</span> <div class="spinner-border" role="status"></div></li>`;
@@ -484,10 +521,16 @@
                     existingItem.find('span').text(`${searchQuery} (Completed)`);
                     existingItem.find('.spinner-border').remove();
                     if (!existingItem.find('.btn-success').length) {
-                        existingItem.append(`<a class="btn btn-success ml-2" href="${url}" target="_blank">Download</a>`);
+                        existingItem.append(`
+                            <button class="btn btn-success" onclick="startDownload('${url}', '${searchQuery}')">Download</button>
+                        `);
                     }
                 } else {
-                    const requestItem = `<li id="${requestId}"><span>${searchQuery} (Completed)</span> <a class="btn btn-success ml-2" href="${url}" target="_blank">Download</a></li>`;
+                    const requestItem = `
+                        <li id="${requestId}">
+                            <span>${searchQuery} (Completed)</span>
+                            <button class="btn btn-success" onclick="startDownload('${url}', '${searchQuery}')">Download</button>
+                        </li>`;
                     $("#requests-list").append(requestItem);
                 }
             };
@@ -539,6 +582,28 @@
                 lyricsFormatSelect.prop('disabled', false);
                 outputFormatSelect.prop('disabled', false);
             }
+        }
+
+        // Add function for background download
+        function startDownload(url, filename) {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+            
+            // Remove the iframe after a short delay
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 2000);
+
+            // Show success message
+            Swal.fire({
+                title: 'Download Started',
+                text: `Downloading ${filename}...`,
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            });
         }
     </script>
     <script>

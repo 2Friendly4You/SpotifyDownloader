@@ -239,7 +239,14 @@ def get_pending_requests():
     return [key.decode('utf-8').split(':')[1] for key in pending_keys]
 
 def notify_client_download_complete(unique_id, download_url):
-    # Changed from broadcast=True to namespace='/'
+    # Store completed download in Redis with 24h expiry
+    redis_client.setex(f"completed:{unique_id}", 
+                      86400,  # 24 hours 
+                      json.dumps({
+                          'url': download_url,
+                          'timestamp': time.time()
+                      }))
+    
     socketio.emit('download_complete', {
         'unique_id': unique_id,
         'url': download_url
@@ -247,18 +254,33 @@ def notify_client_download_complete(unique_id, download_url):
 
 @socketio.on('connect')
 def handle_connect():
-    # Check for any completed downloads for this client
+    # Check for any completed downloads that happened while client was disconnected
     completed_downloads = []
-    for file in os.listdir(music_directory):
-        if file.endswith('.zip'):
-            unique_id = file[:-4]  # Remove .zip extension
-            completed_downloads.append({
-                'unique_id': unique_id,
-                'url': f'https://sddata.codemagie.xyz/music/{unique_id}.zip'
-            })
-    if completed_downloads:
-        # Add namespace here as well
-        emit('download_history', completed_downloads, namespace='/')
+    pending_downloads = []
+    
+    # Get all completed downloads from Redis
+    for key in redis_client.keys("completed:*"):
+        unique_id = key.decode('utf-8').split(':')[1]
+        data = json.loads(redis_client.get(key))
+        completed_downloads.append({
+            'unique_id': unique_id,
+            'url': data['url']
+        })
+    
+    # Get all pending downloads from Redis
+    for key in redis_client.keys("pending:*"):
+        unique_id = key.decode('utf-8').split(':')[1]
+        pending_downloads.append({
+            'unique_id': unique_id,
+            'status': 'pending'
+        })
+    
+    # Send both completed and pending downloads to client
+    if completed_downloads or pending_downloads:
+        emit('download_status', {
+            'completed': completed_downloads,
+            'pending': pending_downloads
+        })
 
 if __name__ == '__main__':
     os.makedirs(music_directory, exist_ok=True)
