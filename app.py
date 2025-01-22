@@ -239,13 +239,19 @@ def get_pending_requests():
     return [key.decode('utf-8').split(':')[1] for key in pending_keys]
 
 def notify_client_download_complete(unique_id, download_url):
-    # Store completed download in Redis with 24h expiry
-    redis_client.setex(f"completed:{unique_id}", 
-                      86400,  # 24 hours 
-                      json.dumps({
-                          'url': download_url,
-                          'timestamp': time.time()
-                      }))
+    data = {
+        'url': download_url,
+        'timestamp': time.time(),
+        'created_at': time.time()  # Add creation timestamp
+    }
+    
+    # Store in Redis with expiration matching retention period
+    retention_seconds = int(os.getenv('RETENTION_DAYS', 14)) * 86400
+    redis_client.setex(
+        f"completed:{unique_id}", 
+        retention_seconds,
+        json.dumps(data)
+    )
     
     socketio.emit('download_complete', {
         'unique_id': unique_id,

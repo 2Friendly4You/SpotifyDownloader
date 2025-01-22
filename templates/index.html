@@ -28,7 +28,6 @@
 
     <title>Spotify Downloader: Download Songs & Playlists Easily</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8J4JDM8GTP"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -39,8 +38,6 @@
     </script>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8210237740497045"
         crossorigin="anonymous"></script>
-
-    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
     <style>
@@ -243,6 +240,79 @@
                 width: auto; /* Override the full width on mobile */
             }
         }
+
+        /* Custom notification system styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .notification {
+            background: var(--secondary);
+            color: var(--text);
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 300px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .notification.success {
+            border-left: 4px solid var(--primary);
+        }
+
+        .notification.error {
+            border-left: 4px solid #dc3545;
+        }
+
+        .notification.info {
+            border-left: 4px solid #0dcaf0;
+        }
+
+        .notification-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .notification-message {
+            font-size: 0.9em;
+        }
+
+        .notification-checkbox {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8em;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 
@@ -340,6 +410,7 @@
             </div>
     </div>
     <br><br>
+    <div class="notification-container"></div>
     <button class="lightMode" onclick="changeLightMode()">
         <span class="material-symbols-outlined">
             settings_brightness
@@ -440,22 +511,8 @@
             });
 
             // Utility function to display alerts
-            const showAlert = async (title, text, cookieName) => {
-                if (getCookie(cookieName) === "") {
-                    const { value: accept } = await Swal.fire({
-                        title,
-                        color: 'black',
-                        icon: 'info',
-                        text,
-                        input: 'checkbox',
-                        inputValue: 0,
-                        inputPlaceholder: 'Do not show again',
-                        confirmButtonText: 'OK',
-                    });
-                    if (accept) {
-                        setCookie(cookieName, true, 365);
-                    }
-                }
+            const showAlert = async (title, text, storageKey) => {
+                await notificationSystem.info(title, text, storageKey);
             };
 
             // Initialize download process
@@ -466,11 +523,7 @@
                 const outputFormat = $("#output_format").val().trim();
 
                 if (!searchQuery || !outputFormat) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Oops...',
-                        text: 'Please provide a search query and select an output format!',
-                    });
+                    notificationSystem.error('Oops...', 'Please provide a search query and select an output format!');
                     return;
                 }
 
@@ -503,11 +556,7 @@
                 })
                 .fail(function(jqXHR, textStatus, errorThrown) {
                     console.error('Request failed:', errorThrown);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Failed to start download. Please try again.',
-                    });
+                    notificationSystem.error('Error', 'Failed to start download. Please try again.');
                 });
 
                 // Clear input after submission
@@ -597,53 +646,7 @@
             }, 2000);
 
             // Show success message
-            Swal.fire({
-                title: 'Download Started',
-                text: `Downloading ${filename}...`,
-                icon: 'success',
-                timer: 2000,
-                showConfirmButton: false
-            });
-        }
-    </script>
-    <script>
-        function setCookie(cname, cvalue, exdays) {
-            const d = new Date();
-            d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
-            let expires = "expires=" + d.toUTCString();
-            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
-        }
-
-        function getCookie(cname) {
-            const name = cname + "=";
-            const decodedCookie = decodeURIComponent(document.cookie);
-            const ca = decodedCookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) == ' ') {
-                    c = c.substring(1);
-                }
-                if (c.indexOf(name) == 0) {
-                    return c.substring(name.length, c.length);
-                }
-            }
-            return "";
-        }
-
-        function checkCookie() {
-            let user = getCookie("username");
-            if (user != "") {
-                alert("Welcome again " + user);
-            } else {
-                user = prompt("Please enter your name:", "");
-                if (user != "" && user != null) {
-                    setCookie("username", user, 365);
-                }
-            }
-        }
-
-        function eraseCookie(name) {
-            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            notificationSystem.success('Download Started', `Downloading ${filename}...`);
         }
     </script>
     <script>
@@ -683,6 +686,136 @@
             // just increment the counter locally
             $("#downloadCounter").text(parseInt($("#downloadCounter").text()) + 1);
         }
+
+        // Custom notification system
+        const notificationSystem = {
+            show: function(options) {
+                const {
+                    title,
+                    message,
+                    type = 'info',
+                    duration = 3000,
+                    storageKey,
+                    showCheckbox = false
+                } = options;
+
+                if (storageKey && localStorage.getItem(storageKey)) {
+                    return Promise.resolve(false);
+                }
+
+                return new Promise((resolve) => {
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    
+                    let html = `
+                        <div>
+                            ${title ? `<div class="notification-title">${title}</div>` : ''}
+                            <div class="notification-message">${message}</div>
+                            ${showCheckbox ? `
+                                <div class="notification-checkbox">
+                                    <input type="checkbox" id="checkbox-${Date.now()}">
+                                    <label>Do not show again</label>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    
+                    notification.innerHTML = html;
+                    
+                    const container = document.querySelector('.notification-container');
+                    container.appendChild(notification);
+
+                    if (showCheckbox) {
+                        const checkbox = notification.querySelector('input[type="checkbox"]');
+                        checkbox.addEventListener('change', (e) => {
+                            if (e.target.checked && storageKey) {
+                                localStorage.setItem(storageKey, 'true');
+                            }
+                        });
+                    }
+
+                    setTimeout(() => {
+                        notification.style.animation = 'slideOut 0.3s ease-out forwards';
+                        setTimeout(() => {
+                            notification.remove();
+                            resolve(true);
+                        }, 300);
+                    }, duration);
+                });
+            },
+            success: function(title, message, duration) {
+                return this.show({ title, message, type: 'success', duration });
+            },
+            error: function(title, message, duration) {
+                return this.show({ title, message, type: 'error', duration });
+            },
+            info: function(title, message, storageKey) {
+                return this.show({
+                    title,
+                    message,
+                    type: 'info',
+                    duration: 5000,
+                    storageKey,
+                    showCheckbox: true
+                });
+            }
+        };
+
+        // Update utility function to use localStorage
+        const showAlert = async (title, text, storageKey) => {
+            await notificationSystem.info(title, text, storageKey);
+        };
+
+        // Remove cookie-related functions and their calls
+        // Delete the entire setCookie, getCookie, checkCookie, and eraseCookie functions
+
+        // Update download process to use new notification system
+        const initiateDownload = async () => {
+            const searchQuery = $("#search_query").val().trim();
+            const audioFormat = $("#audio_format").val().trim();
+            const lyricsFormat = $("#lyrics_format").val().trim();
+            const outputFormat = $("#output_format").val().trim();
+
+            if (!searchQuery || !outputFormat) {
+                notificationSystem.error('Oops...', 'Please provide a search query and select an output format!');
+                return;
+            }
+
+            if (searchQuery.includes("https://open.spotify.com/playlist/")) {
+                await showAlert('Info...', 'Downloading a playlist can take a few minutes.', "playlistNotification");
+            } else if (!searchQuery.includes("https://open.spotify.com/track/")) {
+                await showAlert('Info...', 'Search queries are often very imprecise. Please use links if you want to get accurate results.', "trackNotification");
+            }
+
+            // Submit the download request
+            $.post('/search', {
+                search_query: searchQuery,
+                audio_format: audioFormat,
+                lyrics_format: lyricsFormat,
+                output_format: outputFormat
+            })
+            .done(function(data) {
+                console.log('Search response:', data);
+                if (data.status === 'success' && data.unique_id) {
+                    // Add to pending downloads
+                    pendingDownloads.set(data.unique_id, searchQuery);
+                    saveDownload(data.unique_id, searchQuery); // Save immediately
+                    
+                    // Add to UI
+                    const requestItem = `<li id="${data.unique_id}"><span>${searchQuery} (Pending)</span> <div class="spinner-border" role="status"></div></li>`;
+                    $("#requests-list").append(requestItem);
+                    
+                    incrementDownloadCounter();
+                }
+            })
+            .fail(function(jqXHR, textStatus, errorThrown) {
+                console.error('Request failed:', errorThrown);
+                notificationSystem.error('Error', 'Failed to start download. Please try again.');
+            });
+
+            // Clear input after submission
+            $("#search_query").val('');
+        };
     </script>
 </body>
 
