@@ -8,17 +8,56 @@ $(document).ready(function () {
     });
     const pendingDownloads = new Map();
 
-    // Load only user's downloads from local storage
+    const checkFileStatus = (unique_id) => {
+        return new Promise((resolve, reject) => {
+            $.get(`/status/${unique_id}`)
+                .done(function(response) {
+                    resolve(response);
+                })
+                .fail(function(error) {
+                    reject(error);
+                });
+        });
+    };
+
+    // Update loadDownloadHistory to not remove pending items
     const loadDownloadHistory = () => {
+        console.log("Loading download history...");
         const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+        
+        $("#requests-list").empty();
+        
         userDownloads.forEach(item => {
-            pendingDownloads.set(item.unique_id, item.searchQuery);
-            
-            const requestItem = `<li id="${item.unique_id}">
-                <span>${item.searchQuery} (Checking status...)</span>
+            console.log("Checking item:", item);
+            const tempItem = `<li id="${item.unique_id}">
+                <span>${item.searchQuery} (Checking...)</span>
                 <div class="spinner-border" role="status"></div>
             </li>`;
-            $("#requests-list").append(requestItem);
+            $("#requests-list").append(tempItem);
+
+            $.ajax({
+                url: `/status/${item.unique_id}`,
+                method: 'GET',
+                success: function(response) {
+                    console.log("Status response:", response);
+                    if (response.status === 'completed') {
+                        pendingDownloads.set(item.unique_id, item.searchQuery);
+                        updateRequestItem(item.unique_id, item.searchQuery, response.url);
+                    } else if (response.status === 'pending') {
+                        // Keep the item but update its status
+                        pendingDownloads.set(item.unique_id, item.searchQuery);
+                        const existingItem = $(`#${item.unique_id}`);
+                        existingItem.find('span').text(`${item.searchQuery} (Pending)`);
+                    } else if (response.status === 'not_found') {
+                        console.log("File not found, removing from history");
+                        removeDownloadFromHistory(item.unique_id);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.log("Status check error:", error);
+                    removeDownloadFromHistory(item.unique_id);
+                }
+            });
         });
     };
 
@@ -88,25 +127,66 @@ $(document).ready(function () {
         console.log('Reconnected to server');
     });
 
-    // Update request item in UI
+    // Update request item in UI with better status handling
     const updateRequestItem = (requestId, searchQuery, url) => {
-        const existingItem = $(`#${requestId}`);
-        if (existingItem.length) {
-            existingItem.find('span').text(`${searchQuery} (Completed)`);
-            existingItem.find('.spinner-border').remove();
-            if (!existingItem.find('.btn-success').length) {
-                existingItem.append(`
-                    <button class="btn btn-success" onclick="startDownload('${url}', '${searchQuery}')">Download</button>
-                `);
+        console.log('Updating request item:', requestId, searchQuery, url);
+        $.ajax({
+            url: `/status/${requestId}`,
+            method: 'GET',
+            success: function(response) {
+                console.log('Status response:', response);
+                const existingItem = $(`#${requestId}`);
+                
+                if (!existingItem.length) {
+                    console.log('Item not found in DOM');
+                    return;
+                }
+
+                switch(response.status) {
+                    case 'completed':
+                        existingItem.find('span').text(`${searchQuery} (Completed)`);
+                        existingItem.find('.spinner-border').remove();
+                        if (!existingItem.find('.btn-success').length) {
+                            existingItem.append(`
+                                <button class="btn btn-success" onclick="startDownload('${url}', '${searchQuery}', '${requestId}')">Download</button>
+                            `);
+                        }
+                        break;
+                    case 'pending':
+                        console.log('Download still pending');
+                        existingItem.find('span').text(`${searchQuery} (Pending)`);
+                        if (!existingItem.find('.spinner-border').length) {
+                            existingItem.append('<div class="spinner-border" role="status"></div>');
+                        }
+                        break;
+                    case 'missing_file':
+                        // Only remove if the server specifically says the file is missing
+                        console.log('File is missing, removing from history');
+                        removeDownloadFromHistory(requestId);
+                        break;
+                    default:
+                        console.log('Unexpected status:', response.status);
+                        // Don't remove for unknown statuses
+                        break;
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Status check failed:', error);
+                // Don't remove on error - might be temporary server issue
             }
-        } else {
-            const requestItem = `
-                <li id="${requestId}">
-                    <span>${searchQuery} (Completed)</span>
-                    <button class="btn btn-success" onclick="startDownload('${url}', '${searchQuery}')">Download</button>
-                </li>`;
-            $("#requests-list").append(requestItem);
-        }
+        });
+    };
+
+    // Add new function to remove download from history
+    const removeDownloadFromHistory = (unique_id) => {
+        console.log("Removing from history:", unique_id);
+        const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+        const filteredDownloads = userDownloads.filter(d => d.unique_id !== unique_id);
+        localStorage.setItem('userDownloads', JSON.stringify(filteredDownloads));
+        $(`#${unique_id}`).fadeOut(300, function() {
+            $(this).remove();
+        });
+        pendingDownloads.delete(unique_id);
     };
 
     // Handle search form submission
@@ -154,6 +234,38 @@ $(document).ready(function () {
         });
 
         $("#search_query").val('');
+    };
+
+    // Simplified startDownload function
+    window.startDownload = function(url, filename, unique_id) {
+        console.log("Starting download check for:", unique_id);
+        $.ajax({
+            url: `/status/${unique_id}`,
+            method: 'GET',
+            success: function(response) {
+                console.log("Download status response:", response);
+                if (response.status === 'completed') {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = url;
+                    document.body.appendChild(iframe);
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 2000);
+
+                    notificationSystem.success('Download Started', `Downloading ${filename}...`);
+                } else {
+                    console.log("File no longer available, removing from history");
+                    removeDownloadFromHistory(unique_id);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.log("Download check error:", error);
+                notificationSystem.error('Error', 'Failed to start download. Maybe the file is no longer available.');
+                removeDownloadFromHistory(unique_id);
+            }
+        });
     };
 
     // Event handlers

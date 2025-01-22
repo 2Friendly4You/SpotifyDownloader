@@ -243,13 +243,53 @@ def download_counter():
 
 @app.route('/status/<unique_id>', methods=['GET'])
 def check_request(unique_id):
-    if unique_id in get_pending_requests():
+    app.logger.debug(f"Checking status for {unique_id}")
+    
+    # Force file system sync on Linux
+    if platform.system() != 'Windows':
+        os.system('sync')
+
+    file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
+    completed_key = f"completed:{unique_id}"
+    pending_key = f"pending:{unique_id}"
+    
+    # First check if it's pending
+    if redis_client.exists(pending_key):
+        app.logger.debug(f"{unique_id} is pending")
         return jsonify({'status': 'pending'}), 202
 
-    if os.path.isfile(os.path.join(MUSIC_DIR, unique_id + ".zip")):
-        return jsonify({'status': 'completed', 'url': f'/music/{unique_id}.zip'}), 200
+    # If marked as completed but file doesn't exist
+    if redis_client.exists(completed_key) and not os.path.isfile(file_path):
+        app.logger.debug(f"File marked completed but missing for {unique_id}")
+        redis_client.delete(completed_key)  # Clean up stale record
+        return jsonify({
+            'status': 'missing_file',
+            'message': 'File was completed but is now missing'
+        }), 404
 
-    return jsonify({'status': 'error', 'message': 'File not found'}), 404
+    # If file exists
+    if os.path.isfile(file_path):
+        if not redis_client.exists(completed_key):
+            # Recreate missing Redis record
+            app.logger.debug(f"Recreating Redis record for existing file {unique_id}")
+            data = {
+                'url': f'/music/{unique_id}.zip',
+                'timestamp': time.time(),
+                'created_at': time.time()
+            }
+            retention_seconds = int(os.getenv('RETENTION_DAYS', 14)) * 86400
+            redis_client.setex(completed_key, retention_seconds, json.dumps(data))
+        
+        return jsonify({
+            'status': 'completed',
+            'url': f'/music/{unique_id}.zip'
+        }), 200
+    
+    # If we get here, the file is neither pending nor exists
+    return jsonify({
+        'status': 'not_found',
+        'message': 'File not found'
+    }), 404
 
 # ===============================
 # WebSocket Handlers
