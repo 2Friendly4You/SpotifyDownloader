@@ -22,3 +22,12 @@ docker-compose down
 ```bash
 docker-compose down -v
 ```
+
+## Change the exposed port
+If you want to change the exposed port, you have to change the port in the `docker-compose.yml` file. 
+```yaml
+  spotifydownloader-nginx:
+    ports:
+      - "8900:80"
+```
+You have to change the `8900` to your desired port.

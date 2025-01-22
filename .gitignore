@@ -2,3 +2,31 @@
 /pending_requests.txt
 /searches.json
 /music/*
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Logs
+*.log
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Downloaded music
+music/
+
+# System Files
+.DS_Store
+Thumbs.db

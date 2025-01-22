@@ -5,6 +5,7 @@ import time
 import uuid
 import redis
 import shutil
+import secrets
 import platform
 import threading
 import subprocess
@@ -20,8 +21,14 @@ from flask_limiter.util import get_remote_address
 # Core Configuration
 # ===============================
 
+# Get secret key from environment or generate a secure random one
+SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_hex(32)
+    print("WARNING: Using randomly generated secret key. Set FLASK_SECRET_KEY environment variable for persistence.")
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
+app.config['SECRET_KEY'] = SECRET_KEY
 socketio = SocketIO(app, 
     cors_allowed_origins="*",
     async_mode='eventlet',
