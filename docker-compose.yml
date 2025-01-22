@@ -34,6 +34,7 @@ services:
     volumes:
       - ./music:/var/www/SpotifyDownloader
       - ./images:/var/www/images
+      - ./static:/var/www/static
       - ./searches.json:/app/searches.json
     command: tail -f /dev/null
 
