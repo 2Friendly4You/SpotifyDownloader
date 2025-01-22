@@ -9,6 +9,8 @@ services:
       - spotifydownloader-redis
     volumes_from:
       - spotifydownloader-data
+    volumes:
+      - ./music:/var/www/SpotifyDownloader:rw  # Add explicit read-write flag
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production
@@ -32,7 +34,7 @@ services:
     image: alpine:latest
     container_name: spotifydownloader-data
     volumes:
-      - ./music:/var/www/SpotifyDownloader
+      - ./music:/var/www/SpotifyDownloader:rw  # Add explicit read-write flag
       - ./images:/var/www/images
       - ./static:/var/www/static
       - ./searches.json:/app/searches.json
