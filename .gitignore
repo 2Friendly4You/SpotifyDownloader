@@ -26,7 +26,3 @@ ENV/
 
 # Downloaded music
 music/
-
-# System Files
-.DS_Store
-Thumbs.db

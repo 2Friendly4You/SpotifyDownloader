@@ -78,6 +78,15 @@ input, select {
     font-size: 1rem;
 }
 
+input:disabled, select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--secondary);
+    border-color: var(--border-color);
+    color: var(--text);
+    box-shadow: none;
+}
+
 button {
     background: var(--primary);
     color: var(--background);
@@ -122,6 +131,13 @@ button:hover {
     background: var(--secondary);
     border-radius: 8px;
     margin-bottom: 0.5rem;
+    word-break: break-all; /* Add this line */
+}
+
+#requests-list li span {
+    flex: 1; /* Add this line */
+    min-width: 0; /* Add this line */
+    overflow-wrap: break-word; /* Add this line */
 }
 
 .spinner-border {
@@ -282,6 +298,12 @@ button:hover {
     #requests-list li {
         flex-direction: column;
         align-items: flex-start;
+        gap: 0.75rem; /* Add this line */
+    }
+
+    #requests-list li span {
+        width: 100%; /* Add this line */
+        margin-bottom: 0.5rem; /* Add this line */
     }
 
     .btn-success {
