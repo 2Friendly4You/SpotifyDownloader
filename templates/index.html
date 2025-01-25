@@ -7,20 +7,21 @@
 
     <meta name="description"
         content="Effortlessly download your favorite Spotify songs and playlists with our Spotify Downloader. High-quality audio, multiple formats, and easy-to-use interface. Try now!">
-    <meta name="msapplication-TileImage" content="https://sddata.codemagie.xyz/SpotifyDownloader.png">
+    <meta name="msapplication-TileImage" content="/images/SpotifyDownloader.png">
     <meta property="og:site_name" content="Spotify Downloader">
     <meta property="og:title" content="Spotify Downloader">
     <meta property="og:description"
         content="Effortlessly download your favorite Spotify songs and playlists with our Spotify Downloader. High-quality audio, multiple formats, and easy-to-use interface. Try now!">
-    <meta property="og:image" itemprop="image" content="https://sddata.codemagie.xyz/SpotifyDownloader.png">
+    <meta property="og:image" itemprop="image" content="/images/SpotifyDownloader.png">
     <meta property="og:type" content="website" />
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="300">
     <meta property="og:image:height" content="300">
     <meta property="og:url" content="https://sd.codemagie.xyz/">
-    <link rel="icon" href="https://sddata.codemagie.xyz/SpotifyDownloader.png" type="image/png">
-    <link rel="apple-touch-icon" sizes="300x300" href="https://sddata.codemagie.xyz/SpotifyDownloader.png">
+    <link rel="icon" href="/images/SpotifyDownloader.png" type="image/png">
+    <link rel="apple-touch-icon" sizes="300x300" href="/images/SpotifyDownloader.png">
 
+    <link rel="stylesheet" href="/static/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
     <link rel="stylesheet"
@@ -28,7 +29,6 @@
 
     <title>Spotify Downloader: Download Songs & Playlists Easily</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8J4JDM8GTP"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -39,89 +39,21 @@
     </script>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8210237740497045"
         crossorigin="anonymous"></script>
-
-    <!--Bootstrap-->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-
-    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <style>
-        :root[data-theme="light"] {
-            --text: #020302;
-            --background: #fcfdfc;
-            --primary: #47ff47;
-            --secondary: #d0e2d0;
-            --accent: #588d58;
-        }
-
-        :root[data-theme="dark"] {
-            --text: #fcfdfc;
-            --background: #020302;
-            --primary: #00b800;
-            --secondary: #1d2f1d;
-            --accent: #72a772;
-        }
-
-        /* change default website scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--background);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #5f5f5f;
-            border-radius: 10px;
-        }
-
-
-        body {
-            word-wrap: break-word;
-            font-family: 'Roboto', sans-serif;
-            color: var(--text);
-            background-color: var(--background);
-
-            font-size: larger;
-        }
-
-        /* list little space at the bottom */
-        li {
-            margin-bottom: 5px;
-        }
-
-        .lightMode {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            border-radius: 20%;
-            border-width: 2px;
-            border-style: solid;
-            /* center */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            /* size */
-            width: 40px;
-            height: 40px;
-
-        }
-    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 </head>
 
 <body>
-    <div class="container mt-5">
-        <h1 class="mb-4">Spotify Downloader</h1>
+    <div class="container">
+        <h1>Spotify Downloader</h1>
         <form id="search-form">
             <div class="form-group">
                 <label for="search_query">Search for a song or URL</label>
-                <input type="text" class="form-control" id="search_query" placeholder="Enter a song or URL">
+                <input type="text" id="search_query" placeholder="Enter a song or URL">
             </div>
-            <div class="form-row">
-                <div class="form-group col-md-4">
+            <div class="form-grid">
+                <div class="form-group">
                     <label for="audio_format">Audio provider</label>
-                    <select class="form-control" id="audio_format">
+                    <select id="audio_format">
                         <option value="youtube-music">YouTube Music</option>
                         <option value="youtube">YouTube</option>
                         <option value="slider-kz">slider.kz</option>
@@ -130,18 +62,18 @@
                         <option value="piped">Piped</option>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group">
                     <label for="lyrics_format">Lyrics provider</label>
-                    <select class="form-control" id="lyrics_format">
+                    <select id="lyrics_format">
                         <option value="musixmatch">musixmatch</option>
                         <option value="genius">genius</option>
                         <option value="azlyrics">azlyrics</option>
                         <option value="synced">synced</option>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group">
                     <label for="output_format">Output format</label>
-                    <select class="form-control" id="output_format">
+                    <select id="output_format">
                         <option value="mp3">MP3</option>
                         <option value="m4a">M4A</option>
                         <option value="wav">WAV</option>
@@ -150,14 +82,16 @@
                         <option value="opus">OPUS</option>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
-                    <button type="button" class="btn btn-primary" id="download-button">Search</button>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="button" id="download-button" class="full-width">Search</button>
                 </div>
             </div>
         </form>
 
         <div class="mt-3">
             <h2>Requests</h2>
+            <button class="btn btn-danger mb-2" id="clear-history">Clear History</button>
             <ul id="requests-list">
                 <!-- Requests will be added here dynamically -->
             </ul>
@@ -166,7 +100,7 @@
         <h3>Download counter</h3>
         <span><span id="downloadCounter"></span> Songs/ Playlists were already downloaded</p>
             <br>
-            <div>
+            <div class="faq-section">
                 <h3>FAQ</h3>
                 <p><b>How do I download songs?</b></p>
                 <p>Enter a song title or URL and press Search. Once the song is found, click Download.</p>
@@ -201,215 +135,45 @@
                     public.</p>
             </div>
     </div>
-    <br><br>
-    <button class="lightMode" onclick="changeLightMode()">
-        <span class="material-symbols-outlined">
-            settings_brightness
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-buttons">
+                <a href="https://github.com/2Friendly4You/SpotifyDownloader/issues/new?template=bug_report.md"
+                    class="footer-button" target="_blank" rel="noopener">
+                    <span class="material-symbols-outlined">bug_report</span>
+                    Report Bug
+                </a>
+                <a href="https://github.com/2Friendly4You/SpotifyDownloader/issues/new?template=feature_request.md"
+                    class="footer-button" target="_blank" rel="noopener">
+                    <span class="material-symbols-outlined">lightbulb</span>
+                    Feature Request
+                </a>
+            </div>
+            <div class="footer-divider">|</div>
+            <a href="https://github.com/2Friendly4You/SpotifyDownloader" class="footer-link" target="_blank"
+                rel="noopener">
+                <span class="material-symbols-outlined">code</span>
+                View on GitHub
+            </a>
+            <div class="footer-divider">|</div>
+            <span class="footer-credit">Created with ❤️ by <a href="https://github.com/2Friendly4You"
+                    class="footer-link" target="_blank" rel="noopener">2Friendly4You</a></span>
+        </div>
+    </footer>
+    <div class="notification-container"></div>
+    <button class="theme-switch" onclick="changeLightMode()" aria-label="Toggle theme">
+        <span class="icon sun">
+            <span class="material-symbols-outlined">light_mode</span>
+        </span>
+        <span class="icon moon">
+            <span class="material-symbols-outlined">dark_mode</span>
         </span>
     </button>
 
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        $(document).ready(function () {
-            let requestIdCounter = 0;
-            const requestElements = {};
-
-            // Utility function to display alerts
-            const showAlert = async (title, text, cookieName) => {
-                if (getCookie(cookieName) === "") {
-                    const { value: accept } = await Swal.fire({
-                        title,
-                        color: 'black',
-                        icon: 'info',
-                        text,
-                        input: 'checkbox',
-                        inputValue: 0,
-                        inputPlaceholder: 'Do not show again',
-                        confirmButtonText: 'OK',
-                    });
-                    if (accept) {
-                        setCookie(cookieName, true, 365);
-                    }
-                }
-            };
-
-            // Initialize download process
-            const initiateDownload = async () => {
-                const searchQuery = $("#search_query").val().trim();
-                const audioFormat = $("#audio_format").val().trim();
-                const lyricsFormat = $("#lyrics_format").val().trim();
-                const outputFormat = $("#output_format").val().trim();
-
-                if (!searchQuery || !audioFormat || !lyricsFormat || !outputFormat) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Oops...',
-                        text: 'Please provide a search query and select all options!',
-                    });
-                    return;
-                }
-
-                if (searchQuery.includes("https://open.spotify.com/playlist/")) {
-                    await showAlert('Info...', 'Downloading a playlist can take a few minutes.', "playlistNotification");
-                } else if (!searchQuery.includes("https://open.spotify.com/track/")) {
-                    await showAlert('Info...', 'Search queries are often very imprecise. Please use links if you want to get accurate results.', "trackNotification");
-                }
-
-                const requestId = `request_${requestIdCounter++}`;
-                const requestItem = `<li id="${requestId}"><span>${searchQuery} (Pending)</span> <div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></li>`;
-                $("#requests-list").append(requestItem);
-
-                submitDownloadRequest(searchQuery, audioFormat, lyricsFormat, outputFormat, requestId);
-            };
-
-            // Submit the download request
-            const submitDownloadRequest = (searchQuery, audioFormat, lyricsFormat, outputFormat, requestId) => {
-                $.post('/search', { search_query: searchQuery, audio_format: audioFormat, lyrics_format: lyricsFormat, output_format: outputFormat })
-                    .done((data, textStatus, jqXHR) => handleRequestSuccess(data, requestId, searchQuery))
-                    .fail((jqXHR, textStatus, errorThrown) => handleRequestFailure(requestId, searchQuery, errorThrown));
-            };
-
-            // Handle successful request submission
-            const handleRequestSuccess = (data, requestId, searchQuery) => {
-                incrementDownloadCounter();
-                if (data.status === 'completed') {
-                    updateRequestItem(requestId, searchQuery, data.url);
-                } else {
-                    startStatusCheck(requestId, data.unique_id, searchQuery);
-                }
-            };
-
-            // Handle failed request submission
-            const handleRequestFailure = (requestId, searchQuery, errorThrown) => {
-                console.error('Request failed:', errorThrown);
-                const requestElement = $('#' + requestId);
-                requestElement.find('span').text(`${searchQuery} (Error)`);
-                requestElement.find('.spinner-border').remove();
-            };
-
-            // Periodically check the status of the request
-            const startStatusCheck = (requestId, uniqueId, searchQuery) => {
-                requestElements[requestId] = setInterval(() => {
-                    $.get(`/status/${uniqueId}`, (data) => {
-                        if (data.status === 'completed') {
-                            updateRequestItem(requestId, searchQuery, data.url);
-                            clearInterval(requestElements[requestId]);
-                        }
-                    });
-                }, 10000);
-            };
-
-            // Update the request item in the UI
-            const updateRequestItem = (requestId, searchQuery, url) => {
-                const requestElement = $('#' + requestId);
-                requestElement.find('span').text(`${searchQuery} (Completed)`);
-                const downloadLink = `<a class="btn btn-success" href="${url}" target="_blank">Download</a>`;
-                requestElement.append(downloadLink);
-                requestElement.find('.spinner-border').remove();
-            };
-
-            $("#search-form").submit(function (event) {
-                event.preventDefault();
-                initiateDownload();
-                // clear input
-                $("#search_query").val('');
-            });
-
-            $("#download-button").click(function () {
-                initiateDownload();
-                // clear input
-                $("#search_query").val('');
-            });
-
-            $("#search_query").keypress(function (e) {
-                if (e.which === 13) {
-                    e.preventDefault();
-                    initiateDownload();
-                    // clear input
-                    $("#search_query").val('');
-                }
-            });
-        });
-    </script>
-    <script>
-        function setCookie(cname, cvalue, exdays) {
-            const d = new Date();
-            d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
-            let expires = "expires=" + d.toUTCString();
-            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
-        }
-
-        function getCookie(cname) {
-            const name = cname + "=";
-            const decodedCookie = decodeURIComponent(document.cookie);
-            const ca = decodedCookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) == ' ') {
-                    c = c.substring(1);
-                }
-                if (c.indexOf(name) == 0) {
-                    return c.substring(name.length, c.length);
-                }
-            }
-            return "";
-        }
-
-        function checkCookie() {
-            let user = getCookie("username");
-            if (user != "") {
-                alert("Welcome again " + user);
-            } else {
-                user = prompt("Please enter your name:", "");
-                if (user != "" && user != null) {
-                    setCookie("username", user, 365);
-                }
-            }
-        }
-
-        function eraseCookie(name) {
-            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        }
-    </script>
-    <script>
-        // save to local storage
-        function changeLightMode() {
-            if (localStorage.getItem("lightMode") == "true") {
-                localStorage.setItem("lightMode", "false");
-            } else {
-                localStorage.setItem("lightMode", "true");
-            }
-            setLightMode();
-        }
-
-        // load from local storage
-        function setLightMode() {
-            if (localStorage.getItem("lightMode") == "true") {
-                document.documentElement.setAttribute('data-theme', 'light');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
-        }
-
-        // check if light mode is set
-        if (localStorage.getItem("lightMode") == null) {
-            localStorage.setItem("lightMode", "false");
-        }
-
-        setLightMode();
-    </script>
-    <script>
-        // download counter
-        $.get('/download_counter', function (data) {
-            $("#downloadCounter").text(data);
-        });
-
-        function incrementDownloadCounter() {
-            // just increment the counter locally
-            $("#downloadCounter").text(parseInt($("#downloadCounter").text()) + 1);
-        }
-    </script>
+    <script src="/static/js/notifications.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/downloads.js"></script>
+    <script src="/static/js/main.js"></script>
 </body>
 
 </html>

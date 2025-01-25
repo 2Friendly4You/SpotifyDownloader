@@ -1,0 +1,7 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY cleanup_service.py .
+
+CMD ["python", "cleanup_service.py"]
