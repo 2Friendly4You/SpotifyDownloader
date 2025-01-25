@@ -1,0 +1,61 @@
+services:
+  spotifydownloader-app:
+    build: .
+    container_name: spotifydownloader-app
+    expose:
+      - "5000"
+    depends_on:
+      - spotifydownloader-data
+      - spotifydownloader-redis
+    volumes_from:
+      - spotifydownloader-data
+    volumes:
+      - ./music:/var/www/SpotifyDownloader:rw
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+    restart: unless-stopped
+
+  spotifydownloader-nginx:
+    image: nginx:alpine
+    container_name: spotifydownloader-nginx
+    ports:
+      - "8900:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - spotifydownloader-app
+      - spotifydownloader-data
+    volumes_from:
+      - spotifydownloader-data
+    restart: unless-stopped
+
+  spotifydownloader-data:
+    image: alpine:latest
+    container_name: spotifydownloader-data
+    volumes:
+      - ./music:/var/www/SpotifyDownloader:rw
+      - ./images:/var/www/images
+      - ./static:/var/www/static
+      - ./searches.json:/app/searches.json
+    command: tail -f /dev/null
+
+  spotifydownloader-redis:
+    image: redis:alpine
+    container_name: spotifydownloader-redis
+    restart: unless-stopped
+
+  spotifydownloader-cleanup:
+    build:
+      context: .
+      dockerfile: Dockerfile.cleanup
+    container_name: spotifydownloader-cleanup
+    volumes_from:
+      - spotifydownloader-data
+    environment:
+      - RETENTION_DAYS=14  # Set retention period in days
+      - CLEANUP_INTERVAL=86400  # Cleanup check interval in seconds (default: 24h)
+    depends_on:
+      - spotifydownloader-data
+    restart: unless-stopped

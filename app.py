@@ -1,181 +1,380 @@
+import os
+import re
+import json
+import time
+import uuid
+import redis
+import shutil
+import secrets
+import platform
+import threading
+import subprocess
+from urllib.parse import urlparse
+
+import yt_dlp
 from flask import Flask, request, jsonify, render_template
+from flask_socketio import SocketIO, emit
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import os
-import subprocess
-import threading
-import uuid
-import shutil
-import time
-import json
-from urllib.parse import urlparse
-import re
+
+# ===============================
+# Core Configuration
+# ===============================
+
+# Get secret key from environment or generate a secure random one
+SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_hex(32)
+    print("WARNING: Using randomly generated secret key. Set FLASK_SECRET_KEY environment variable for persistence.")
 
 app = Flask(__name__)
-music_directory = "/var/www/SpotifyDownloader/"
+app.config['SECRET_KEY'] = SECRET_KEY
+socketio = SocketIO(app, 
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25
+)
+redis_client = redis.Redis(host='spotifydownloader-redis', port=6379, db=0)
 
-uri = 'memcached://localhost:11211'  # URI to the storage backend
-
+# Configure rate limiting
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    storage_uri=uri,
+    storage_uri="memory:///rate_limits.db"
 )
 
-pending_requests_file = 'pending_requests.txt'
+# Configure paths and constants
+MUSIC_DIR = "C:/SpotifyDownloader/music/" if platform.system() == 'Windows' else "/var/www/SpotifyDownloader/"
+PENDING_REQUESTS_FILE = os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), 'pending_requests.txt')
+
+# Valid format options
+VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube',
+                         'slider-kz', 'soundcloud', 'bandcamp', 'piped', 'yt-dlp'}
+VALID_LYRICS_PROVIDERS = {'musixmatch', 'genius', 'azlyrics', 'synced'}
+VALID_OUTPUT_FORMATS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'}
+
+# ===============================
+# Validation Functions
+# ===============================
 
 
 def is_valid_url(input_url):
-    """Check if the input string is a valid URL."""
     try:
         result = urlparse(input_url)
         return all([result.scheme, result.netloc])
     except:
         return False
 
+
 def validate_spotify_url(input_url):
-    """Validate if the input URL is a valid Spotify link."""
     parsed_url = urlparse(input_url)
-    return parsed_url.scheme in ['http', 'https'] and \
-           parsed_url.netloc == 'open.spotify.com'
+    return parsed_url.scheme in ['http', 'https'] and parsed_url.netloc == 'open.spotify.com'
+
+
+def is_youtube_url(url):
+    youtube_regex = r'^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$'
+    return bool(re.match(youtube_regex, url))
+
 
 def validate_song_title(title):
-    """Basic validation for song titles."""
     return bool(re.match(r"^[a-zA-Z0-9\s\-'.,!&?=-]+$", title))
 
+
 def validate_input(input_string):
-    """Determine if input is a Spotify URL or song title, then validate accordingly."""
     if is_valid_url(input_string):
-        return validate_spotify_url(input_string)
-    else:
-        return validate_song_title(input_string)
+        return validate_spotify_url(input_string) or is_youtube_url(input_string)
+    return validate_song_title(input_string)
 
-# Define valid options for each dropdown
-VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'slider-kz', 'soundcloud', 'bandcamp', 'piped'}
-VALID_LYRICS_PROVIDERS = {'musixmatch', 'genius', 'azlyrics', 'synced'}
-VALID_OUTPUT_FORMATS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'}
 
-def validate_audio_provider(selection):
-    return selection in VALID_AUDIO_PROVIDERS
+def validate_format_options(audio_format, lyrics_format, output_format):
+    return (
+        audio_format in VALID_AUDIO_PROVIDERS and
+        lyrics_format in VALID_LYRICS_PROVIDERS and
+        output_format in VALID_OUTPUT_FORMATS
+    )
 
-def validate_lyrics_provider(selection):
-    return selection in VALID_LYRICS_PROVIDERS
-
-def validate_output_format(selection):
-    return selection in VALID_OUTPUT_FORMATS
+# ===============================
+# Download Functions
+# ===============================
 
 
 def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
-    with open(pending_requests_file, 'a') as pending_file:
-        pending_file.write(unique_id + '\n')
-
-    download_folder = os.path.join(music_directory, unique_id)
+    redis_client.setex(f"pending:{unique_id}", 3600, "1")
+    download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
 
-    command = ['spotdl', search_query, '--max-retries', '2', '--audio', audio_format, '--format', output_format, '--output', download_folder, '--threads', '4']
-
     try:
+        command = [
+            'spotdl', search_query,
+            '--max-retries', '2',
+            '--audio', audio_format,
+            '--format', output_format,
+            '--output', download_folder,
+            '--threads', '4'
+        ]
         result = subprocess.run(command, check=True, text=True)
-    except subprocess.CalledProcessError as e:
-        result = e
 
-    if result.returncode == 0:
-        try:
+        if result.returncode == 0:
             shutil.make_archive(download_folder, 'zip', download_folder)
-        except FileNotFoundError:
-            with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
-                error_file.write("Error downloading song")
-            shutil.make_archive(download_folder, 'zip', download_folder)
-    else:
-        with open(os.path.join(download_folder, 'error.txt'), 'w') as error_file:
-            error_file.write("Error downloading song")
+            notify_client_download_complete(
+                unique_id, f'/music/{unique_id}.zip')
+        else:
+            raise subprocess.CalledProcessError(result.returncode, command)
+
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        with open(os.path.join(download_folder, 'error.txt'), 'w') as f:
+            f.write(f"Error downloading: {str(e)}")
         shutil.make_archive(download_folder, 'zip', download_folder)
 
-    shutil.rmtree(download_folder)
+    finally:
+        shutil.rmtree(download_folder)
+        redis_client.delete(f"pending:{unique_id}")
 
-    with open(pending_requests_file, 'r') as pending_file:
-        lines = pending_file.readlines()
-    with open(pending_requests_file, 'w') as pending_file:
-        for line in lines:
-            if line.strip() != unique_id:
-                pending_file.write(line)
+
+def download_from_youtube(unique_id, url, output_format):
+    redis_client.setex(f"pending:{unique_id}", 3600, "1")
+    download_folder = os.path.join(MUSIC_DIR, unique_id)
+    os.makedirs(download_folder, exist_ok=True)
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': output_format,
+                'preferredquality': '320',
+            },
+            {
+                'key': 'FFmpegMetadata',
+                'add_metadata': True,
+            },
+            {
+                'key': 'EmbedThumbnail',
+            }
+        ],
+        'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
+        'writethumbnail': True,
+        'embedthumbnail': True,
+        'postprocessor_args': [
+            '-write_id3v1', '1',
+            '-id3v2_version', '3',
+        ],
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        # Clean up thumbnails
+        for file in os.listdir(download_folder):
+            if file.endswith(('.webp', '.jpg', '.png')):
+                os.remove(os.path.join(download_folder, file))
+
+        shutil.make_archive(download_folder, 'zip', download_folder)
+        notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
+
+    except Exception as e:
+        with open(os.path.join(download_folder, 'error.txt'), 'w') as f:
+            f.write(f"Error downloading: {str(e)}")
+        shutil.make_archive(download_folder, 'zip', download_folder)
+
+    finally:
+        shutil.rmtree(download_folder)
+        redis_client.delete(f"pending:{unique_id}")
+
+# ===============================
+# Route Handlers
+# ===============================
+
 
 @app.route('/')
 def index():
     return render_template('index.html', pending_requests=get_pending_requests()), 200
 
+
 @app.route('/search', methods=['POST'])
 @limiter.limit("1/5seconds;10/minute")
 def search():
-    # Load search counter and last search query
-    with open('searches.json', 'r') as f:
-        searches = json.load(f)
-    searches['total'] += 1
     search_query = request.form['search_query']
-    searches['last'] = search_query
-    with open('searches.json', 'w') as f:
-        json.dump(searches, f)
-
-    # Extract form data
     audio_format = request.form.get('audio_format')
     lyrics_format = request.form.get('lyrics_format')
     output_format = request.form.get('output_format')
 
+    # Validate inputs
     if not search_query:
         return jsonify({'status': 'error', 'message': 'Search query is required'}), 400
 
-    # validate search query and form data and send 400 bad request if invalid
-    if not validate_input(search_query) or \
-       not validate_audio_provider(audio_format) or \
-       not validate_lyrics_provider(lyrics_format) or \
-       not validate_output_format(output_format):
+    if is_youtube_url(search_query):
+        if not output_format in VALID_OUTPUT_FORMATS:
+            return jsonify({'status': 'error', 'message': 'Invalid output format'}), 400
+    elif not all([
+        validate_input(search_query),
+        validate_format_options(audio_format, lyrics_format, output_format)
+    ]):
         return jsonify({'status': 'error', 'message': 'Invalid input provided'}), 400
 
+    # Update download counter
+    with open('searches.json', 'r+') as f:
+        searches = json.load(f)
+        searches['total'] += 1
+        searches['last'] = search_query
+        f.seek(0)
+        json.dump(searches, f)
+        f.truncate()
+
+    # Start download process
     unique_id = str(uuid.uuid4())
-    thread = threading.Thread(target=run_spotdl, args=(unique_id, search_query, audio_format, lyrics_format, output_format))
+    thread = threading.Thread(
+        target=download_from_youtube if is_youtube_url(
+            search_query) else run_spotdl,
+        args=(unique_id, search_query, output_format) if is_youtube_url(search_query)
+        else (unique_id, search_query, audio_format, lyrics_format, output_format)
+    )
     thread.start()
 
-    return jsonify({'status': 'success', 'message': 'Song download started', 'unique_id': unique_id}), 202
+    return jsonify({
+        'status': 'success',
+        'message': 'Download started',
+        'unique_id': unique_id
+    }), 202
+
 
 @app.route('/download_counter', methods=['GET'])
 def download_counter():
     with open('searches.json', 'r') as f:
-        searches = json.load(f)
-    return str(searches['total'])
+        return str(json.load(f)['total'])
 
 
 @app.route('/status/<unique_id>', methods=['GET'])
 def check_request(unique_id):
-    pending_requests = get_pending_requests()
+    app.logger.debug(f"Checking status for {unique_id}")
+    
+    # Force file system sync on Linux
+    if platform.system() != 'Windows':
+        os.system('sync')
 
-    if unique_id in pending_requests:
+    file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
+    completed_key = f"completed:{unique_id}"
+    pending_key = f"pending:{unique_id}"
+    
+    # First check if it's pending
+    if redis_client.exists(pending_key):
+        app.logger.debug(f"{unique_id} is pending")
         return jsonify({'status': 'pending'}), 202
-    else:
-        # Check if the file exists
-        if os.path.isfile(os.path.join(music_directory, unique_id + ".zip")):
-            return jsonify({'status': 'completed', 'url': 'https://sddata.codemagie.xyz/music/' + unique_id + '.zip'}), 200
-        else:
-            return jsonify({'status': 'error', 'message': 'File not found'}), 404
+
+    # If marked as completed but file doesn't exist
+    if redis_client.exists(completed_key) and not os.path.isfile(file_path):
+        app.logger.debug(f"File marked completed but missing for {unique_id}")
+        redis_client.delete(completed_key)  # Clean up stale record
+        return jsonify({
+            'status': 'missing_file',
+            'message': 'File was completed but is now missing'
+        }), 404
+
+    # If file exists
+    if os.path.isfile(file_path):
+        if not redis_client.exists(completed_key):
+            # Recreate missing Redis record
+            app.logger.debug(f"Recreating Redis record for existing file {unique_id}")
+            data = {
+                'url': f'/music/{unique_id}.zip',
+                'timestamp': time.time(),
+                'created_at': time.time()
+            }
+            retention_seconds = int(os.getenv('RETENTION_DAYS', 14)) * 86400
+            redis_client.setex(completed_key, retention_seconds, json.dumps(data))
+        
+        return jsonify({
+            'status': 'completed',
+            'url': f'/music/{unique_id}.zip'
+        }), 200
+    
+    # If we get here, the file is neither pending nor exists
+    return jsonify({
+        'status': 'not_found',
+        'message': 'File not found'
+    }), 404
+
+# ===============================
+# WebSocket Handlers
+# ===============================
 
 
-def delete_file(download_file):
-    try:
-        time.sleep(3600)
-        os.remove(download_file)
-    except:
-        pass
+@socketio.on('connect')
+def handle_connect():
+    completed_downloads = []
+    pending_downloads = []
+
+    # Get completed downloads
+    for key in redis_client.keys("completed:*"):
+        unique_id = key.decode('utf-8').split(':')[1]
+        data = json.loads(redis_client.get(key))
+        completed_downloads.append({
+            'unique_id': unique_id,
+            'url': data['url']
+        })
+
+    # Get pending downloads
+    for key in redis_client.keys("pending:*"):
+        unique_id = key.decode('utf-8').split(':')[1]
+        pending_downloads.append({
+            'unique_id': unique_id,
+            'status': 'pending'
+        })
+
+    if completed_downloads or pending_downloads:
+        emit('download_status', {
+            'completed': completed_downloads,
+            'pending': pending_downloads
+        })
+
+# ===============================
+# File Management Functions
+# ===============================
+
 
 def get_pending_requests():
-    try:
-        with open(pending_requests_file, 'r') as pending_file:
-            return [line.strip() for line in pending_file.readlines()]
-    except FileNotFoundError:
-        return []
+    pending_keys = redis_client.keys("pending:*")
+    return [key.decode('utf-8').split(':')[1] for key in pending_keys]
+
+
+def notify_client_download_complete(unique_id, download_url):
+    data = {
+        'url': download_url,
+        'timestamp': time.time(),
+        'created_at': time.time()
+    }
+
+    retention_seconds = int(os.getenv('RETENTION_DAYS', 14)) * 86400
+    redis_client.setex(
+        f"completed:{unique_id}",
+        retention_seconds,
+        json.dumps(data)
+    )
+
+    socketio.emit('download_complete', {
+        'unique_id': unique_id,
+        'url': download_url
+    }, namespace='/')
+
+# ===============================
+# Application Startup
+# ===============================
+
 
 if __name__ == '__main__':
-    os.makedirs(music_directory, exist_ok=True)
-    # create json file if it doesn't exist
+    # Initialize directories and files
+    os.makedirs(MUSIC_DIR, exist_ok=True)
+
+    if not os.path.isfile(PENDING_REQUESTS_FILE):
+        open(PENDING_REQUESTS_FILE, 'w').close()
+
     if not os.path.isfile('searches.json'):
         with open('searches.json', 'w') as f:
             json.dump({'total': 0, 'last': ''}, f)
-    app.run(host='0.0.0.0', port=5000, debug=False)
+
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
