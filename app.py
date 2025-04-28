@@ -114,7 +114,8 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             '--audio', audio_format,
             '--format', output_format,
             '--output', download_folder,
-            '--threads', '4'
+            '--threads', '4',
+            '--bitrate', '320k'  # Ensure a valid bitrate is set
         ]
         result = subprocess.run(command, check=True, text=True)
 
