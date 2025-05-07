@@ -9,13 +9,12 @@ import secrets
 import platform
 import threading
 import subprocess
+import zipfile # Added import
 from urllib.parse import urlparse
 
 import yt_dlp
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO, emit
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 # ===============================
 # Core Configuration
@@ -39,17 +38,11 @@ socketio = SocketIO(app,
 )
 redis_client = redis.Redis(host='spotifydownloader-redis', port=6379, db=0)
 
-# Configure rate limiting
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    storage_uri="memory:///rate_limits.db"
-)
-
 # Configure paths and constants
 MUSIC_DIR = "C:/SpotifyDownloader/music/" if platform.system() == 'Windows' else "/var/www/SpotifyDownloader/"
 PENDING_REQUESTS_FILE = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), 'pending_requests.txt')
+MAX_PENDING_REQUESTS = int(os.environ.get('MAX_PENDING_REQUESTS', 5)) # Read from environment or default to 5
 
 # Valid format options
 VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube',
@@ -103,9 +96,13 @@ def validate_format_options(audio_format, lyrics_format, output_format):
 
 
 def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_format):
-    redis_client.setex(f"pending:{unique_id}", 3600, "1")
+    redis_client.setex(f"pending:{unique_id}", 3600, "1") # Mark as pending for 1 hour
     download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
+    
+    retention_seconds = int(os.getenv('RETENTION_DAYS', 7)) * 86400
+    # Construct zip_file_path using the download_folder, not its parent
+    zip_file_path = os.path.join(MUSIC_DIR, unique_id + ".zip") 
 
     try:
         command = [
@@ -113,26 +110,108 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             '--max-retries', '2',
             '--audio', audio_format,
             '--format', output_format,
-            '--output', download_folder,
+            '--output', download_folder, # spotdl downloads into this folder
             '--threads', '4',
-            '--bitrate', '320k'  # Ensure a valid bitrate is set
+            '--bitrate', '320k'
         ]
-        result = subprocess.run(command, check=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='replace')
 
         if result.returncode == 0:
-            shutil.make_archive(download_folder, 'zip', download_folder)
-            notify_client_download_complete(
-                unique_id, f'/music/{unique_id}.zip')
+            # spotdl command reported success, now create the archive from the download_folder contents
+            # The archive should be placed in MUSIC_DIR, named unique_id.zip
+            # root_dir should be MUSIC_DIR to get flat structure inside zip, or download_folder for nested
+            # For consistency, let's archive the contents of download_folder directly.
+            shutil.make_archive(os.path.join(MUSIC_DIR, unique_id), 'zip', root_dir=download_folder)
+
+            if not os.path.exists(zip_file_path):
+                user_message = "Download failed: Archive file was not created after successful command."
+                app.logger.error(f"Zip file {zip_file_path} not found after make_archive for {unique_id} (spotdl).")
+                socketio.emit('download_failed', {
+                    'unique_id': unique_id, 'search_query': search_query,
+                    'message': user_message, 'zip_url': None
+                }, namespace='/')
+                redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+                return # Exit after failure
+
+            try:
+                with zipfile.ZipFile(zip_file_path, 'r') as zf:
+                    # Filter out directories and count only actual files
+                    file_list = [info.filename for info in zf.infolist() if not info.is_dir()]
+                
+                if not file_list:
+                    user_message = "Download failed: The downloaded archive is empty."
+                    app.logger.warning(f"Empty zip detected for {unique_id} (spotdl). Path: {zip_file_path}")
+                    socketio.emit('download_failed', {
+                        'unique_id': unique_id, 'search_query': search_query,
+                        'message': user_message, 'zip_url': None
+                    }, namespace='/')
+                    redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+                    if os.path.exists(zip_file_path): os.remove(zip_file_path) # Clean up empty zip
+                    return # Exit after failure
+            except zipfile.BadZipFile:
+                user_message = "Download failed: The downloaded archive is corrupted."
+                app.logger.warning(f"Corrupted zip detected for {unique_id} (spotdl). Path: {zip_file_path}")
+                socketio.emit('download_failed', {
+                    'unique_id': unique_id, 'search_query': search_query,
+                    'message': user_message, 'zip_url': None
+                }, namespace='/')
+                redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+                if os.path.exists(zip_file_path): os.remove(zip_file_path) # Clean up corrupted zip
+                return # Exit after failure
+
+            # If all checks pass
+            notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
         else:
-            raise subprocess.CalledProcessError(result.returncode, command)
+            # spotdl command failed (result.returncode != 0)
+            error_output_stderr = result.stderr if result.stderr else ""
+            error_output_stdout = result.stdout if result.stdout else ""
+            full_error_output = f"STDERR:\\n{error_output_stderr}\\nSTDOUT:\\n{error_output_stdout}"
+            specific_yt_dlp_error = "AudioProviderError: YT-DLP download error" in error_output_stderr
+            
+            user_message = ""
+            if specific_yt_dlp_error:
+                yt_match = re.search(r"(https://(?:music\\.)?youtube\\.com/watch\\?v=[\\w-]+)", error_output_stderr)
+                yt_link_msg = f" for {yt_match.group(1)}" if yt_match else ""
+                user_message = f"Download failed: Could not fetch from YouTube Music{yt_link_msg}. The song might be unavailable or an issue with the provider."
+            else:
+                first_error_line = error_output_stderr.splitlines()[0] if error_output_stderr.splitlines() else "Unknown spotdl error"
+                user_message = f"Download failed: {first_error_line[:150]}" # Truncate
 
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        with open(os.path.join(download_folder, 'error.txt'), 'w') as f:
-            f.write(f"Error downloading: {str(e)}")
-        shutil.make_archive(download_folder, 'zip', download_folder)
+            app.logger.error(f"SpotDL error for {unique_id} (return code {result.returncode}):\\n{full_error_output}")
 
+            # No error.txt for user, no zip file for user on failure. Message is sent via socket.
+            socketio.emit('download_failed', {
+                'unique_id': unique_id,
+                'search_query': search_query,
+                'message': user_message,
+                'zip_url': None # No zip file for failed downloads
+            }, namespace='/')
+            redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+
+    except FileNotFoundError:
+        user_message = "Download failed: spotdl command not found. Ensure it's installed and accessible in PATH."
+        app.logger.error(f"SpotDL FileNotFoundError for {unique_id} processing {search_query}")
+        socketio.emit('download_failed', {
+            'unique_id': unique_id,
+            'search_query': search_query,
+            'message': user_message,
+            'zip_url': None # No zip file
+        }, namespace='/')
+        redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+    except Exception as e:
+        user_message = f"An unexpected error occurred during spotdl processing: {str(e)}"
+        app.logger.error(f"Unexpected error in run_spotdl for {unique_id} ({search_query}): {str(e)}", exc_info=True)
+        
+        socketio.emit('download_failed', {
+            'unique_id': unique_id,
+            'search_query': search_query,
+            'message': user_message,
+            'zip_url': None # No zip file
+        }, namespace='/')
+        redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
     finally:
-        shutil.rmtree(download_folder)
+        if os.path.exists(download_folder):
+            shutil.rmtree(download_folder)
         redis_client.delete(f"pending:{unique_id}")
 
 
@@ -140,6 +219,8 @@ def download_from_youtube(unique_id, url, output_format):
     redis_client.setex(f"pending:{unique_id}", 3600, "1")
     download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
+    retention_seconds = int(os.getenv('RETENTION_DAYS', 7)) * 86400
+    zip_file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
 
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -157,7 +238,7 @@ def download_from_youtube(unique_id, url, output_format):
                 'key': 'EmbedThumbnail',
             }
         ],
-        'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
+        'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'), # yt-dlp downloads into this folder
         'writethumbnail': True,
         'embedthumbnail': True,
         'postprocessor_args': [
@@ -170,21 +251,63 @@ def download_from_youtube(unique_id, url, output_format):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # Clean up thumbnails
-        for file in os.listdir(download_folder):
-            if file.endswith(('.webp', '.jpg', '.png')):
-                os.remove(os.path.join(download_folder, file))
+        # Clean up thumbnails from download_folder before zipping
+        for file_in_dir in os.listdir(download_folder):
+            if file_in_dir.endswith(('.webp', '.jpg', '.png')):
+                os.remove(os.path.join(download_folder, file_in_dir))
 
-        shutil.make_archive(download_folder, 'zip', download_folder)
+        # yt-dlp command reported success, now create and check the archive
+        shutil.make_archive(os.path.join(MUSIC_DIR, unique_id), 'zip', root_dir=download_folder)
+        
+        if not os.path.exists(zip_file_path):
+            user_message = "Download failed: Archive file was not created after successful command."
+            app.logger.error(f"Zip file {zip_file_path} not found after make_archive for {unique_id} (youtube-dl).")
+            socketio.emit('download_failed', {
+                'unique_id': unique_id, 'search_query': url,
+                'message': user_message, 'zip_url': None
+            }, namespace='/')
+            redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+            return # Exit after failure
+
+        try:
+            with zipfile.ZipFile(zip_file_path, 'r') as zf:
+                file_list = [info.filename for info in zf.infolist() if not info.is_dir()]
+            
+            if not file_list:
+                user_message = "Download failed: The downloaded archive is empty."
+                app.logger.warning(f"Empty zip detected for {unique_id} (youtube-dl). Path: {zip_file_path}")
+                socketio.emit('download_failed', {
+                    'unique_id': unique_id, 'search_query': url,
+                    'message': user_message, 'zip_url': None
+                }, namespace='/')
+                redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+                if os.path.exists(zip_file_path): os.remove(zip_file_path) # Clean up empty zip
+                return # Exit after failure
+        except zipfile.BadZipFile:
+            user_message = "Download failed: The downloaded archive is corrupted."
+            app.logger.warning(f"Corrupted zip detected for {unique_id} (youtube-dl). Path: {zip_file_path}")
+            socketio.emit('download_failed', {
+                'unique_id': unique_id, 'search_query': url,
+                'message': user_message, 'zip_url': None
+            }, namespace='/')
+            redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
+            if os.path.exists(zip_file_path): os.remove(zip_file_path) # Clean up corrupted zip
+            return # Exit after failure
+            
+        # If all checks pass
         notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
 
-    except Exception as e:
-        with open(os.path.join(download_folder, 'error.txt'), 'w') as f:
-            f.write(f"Error downloading: {str(e)}")
-        shutil.make_archive(download_folder, 'zip', download_folder)
-
+    except Exception as e: # Catches yt-dlp errors and other exceptions in this block
+        user_message = f"YouTube download failed: {str(e)}"
+        app.logger.error(f"YouTubeDL error for {unique_id} processing {url}: {str(e)}", exc_info=True)
+        socketio.emit('download_failed', {
+            'unique_id': unique_id, 'search_query': url,
+            'message': user_message, 'zip_url': None
+        }, namespace='/')
+        redis_client.setex(f"failed:{unique_id}", retention_seconds, user_message)
     finally:
-        shutil.rmtree(download_folder)
+        if os.path.exists(download_folder):
+            shutil.rmtree(download_folder)
         redis_client.delete(f"pending:{unique_id}")
 
 # ===============================
@@ -198,8 +321,11 @@ def index():
 
 
 @app.route('/search', methods=['POST'])
-@limiter.limit("1/5seconds;10/minute")
 def search():
+    # Check pending requests
+    if len(get_pending_requests()) >= MAX_PENDING_REQUESTS:
+        return jsonify({'status': 'error', 'message': 'Too many requests. Please try again later.'}), 429
+
     search_query = request.form['search_query']
     audio_format = request.form.get('audio_format')
     lyrics_format = request.form.get('lyrics_format')
@@ -241,7 +367,7 @@ def search():
         'status': 'success',
         'message': 'Download started',
         'unique_id': unique_id
-    }), 202
+    }, 202)
 
 
 @app.route('/download_counter', methods=['GET'])
@@ -254,51 +380,47 @@ def download_counter():
 def check_request(unique_id):
     app.logger.debug(f"Checking status for {unique_id}")
     
-    # Force file system sync on Linux
     if platform.system() != 'Windows':
         os.system('sync')
 
     file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
-    completed_key = f"completed:{unique_id}"
     pending_key = f"pending:{unique_id}"
-    
-    # First check if it's pending
+    failed_key = f"failed:{unique_id}"
+    completed_key = f"completed:{unique_id}" # This key is set by notify_client_download_complete
+
     if redis_client.exists(pending_key):
         app.logger.debug(f"{unique_id} is pending")
         return jsonify({'status': 'pending'}), 202
 
-    # If marked as completed but file doesn't exist
-    if redis_client.exists(completed_key) and not os.path.isfile(file_path):
-        app.logger.debug(f"File marked completed but missing for {unique_id}")
-        redis_client.delete(completed_key)  # Clean up stale record
-        return jsonify({
-            'status': 'missing_file',
-            'message': 'File was completed but is now missing'
-        }), 404
+    if redis_client.exists(failed_key):
+        error_message = redis_client.get(failed_key).decode('utf-8', 'replace')
+        zip_url = f'/music/{unique_id}.zip' if os.path.isfile(file_path) else None
+        app.logger.debug(f"{unique_id} is failed: {error_message}")
+        return jsonify({'status': 'failed', 'message': error_message, 'url': zip_url}), 200
 
-    # If file exists
+    if redis_client.exists(completed_key):
+        if os.path.isfile(file_path):
+            app.logger.debug(f"{unique_id} is completed (Redis key exists, file exists)")
+            return jsonify({'status': 'completed', 'url': f'/music/{unique_id}.zip'}), 200
+        else:
+            app.logger.warning(f"Completed key {completed_key} exists but file {file_path} is missing.")
+            # Potentially clean up: redis_client.delete(completed_key)
+            return jsonify({'status': 'error', 'message': 'File was marked completed but is now missing.'}), 404
+            
+    # Fallback: File exists but no explicit Redis state (pending, failed, completed).
+    # This could be an old file or Redis data loss.
     if os.path.isfile(file_path):
-        if not redis_client.exists(completed_key):
-            # Recreate missing Redis record
-            app.logger.debug(f"Recreating Redis record for existing file {unique_id}")
-            data = {
-                'url': f'/music/{unique_id}.zip',
-                'timestamp': time.time(),
-                'created_at': time.time()
-            }
-            retention_seconds = int(os.getenv('RETENTION_DAYS', 14)) * 86400
-            redis_client.setex(completed_key, retention_seconds, json.dumps(data))
-        
-        return jsonify({
-            'status': 'completed',
-            'url': f'/music/{unique_id}.zip'
-        }), 200
+        app.logger.info(f"File {file_path} exists without explicit Redis completed/failed state. Treating as completed.")
+        # To ensure consistency, we can re-trigger the 'completed' state logic
+        # This will set the 'completed:<id>' key and emit to sockets if necessary.
+        # However, notify_client_download_complete also emits a socket event, which might be redundant if client is just polling.
+        # For simplicity here, just return completed status. If full consistency is needed, call:
+        # notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
+        # For now, just return the status:
+        return jsonify({'status': 'completed', 'url': f'/music/{unique_id}.zip'}), 200
     
-    # If we get here, the file is neither pending nor exists
-    return jsonify({
-        'status': 'not_found',
-        'message': 'File not found'
-    }), 404
+    app.logger.debug(f"{unique_id} not found (no pending, failed, completed key, and no file)")
+    return jsonify({'status': 'not_found', 'message': 'Request not found or expired.'}), 404
 
 # ===============================
 # WebSocket Handlers

@@ -23,50 +23,69 @@ $(document).ready(function () {
     // Update loadDownloadHistory to not remove pending items
     const loadDownloadHistory = () => {
         console.log("Loading download history...");
-        const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+        const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         
         $("#requests-list").empty();
         
         userDownloads.forEach(item => {
-            console.log("Checking item:", item);
-            const tempItem = `<li id="${item.unique_id}">
-                <span>${item.searchQuery} (Checking...)</span>
-                <div class="spinner-border" role="status"></div>
-            </li>`;
-            $("#requests-list").append(tempItem);
+            console.log("Loading item from history:", item);
+            // Initial display based on stored status
+            let initialDisplay = `<li id="${item.unique_id}"><span>${item.searchQuery} (${item.status || 'Checking...'})</span>`;
+            if (item.status === 'pending') {
+                initialDisplay += ` <div class="spinner-border spinner-border-sm" role="status"></div>`;
+            }
+            initialDisplay += `</li>`;
+            $("#requests-list").append(initialDisplay);
 
+            // Then verify/update status with the server
             $.ajax({
                 url: `/status/${item.unique_id}`,
                 method: 'GET',
-                success: function(response) {
-                    console.log("Status response:", response);
-                    if (response.status === 'completed') {
-                        pendingDownloads.set(item.unique_id, item.searchQuery);
-                        updateRequestItem(item.unique_id, item.searchQuery, response.url);
-                    } else if (response.status === 'pending') {
-                        // Keep the item but update its status
-                        pendingDownloads.set(item.unique_id, item.searchQuery);
-                        const existingItem = $(`#${item.unique_id}`);
-                        existingItem.find('span').text(`${item.searchQuery} (Pending)`);
-                    } else if (response.status === 'not_found') {
-                        console.log("File not found, removing from history");
+                success: function(response) { // jQuery .done() equivalent
+                    console.log("Status response for " + item.searchQuery + " (" + item.unique_id + "):", response);
+                    
+                    if (response.status === 'not_found' || 
+                        (response.status === 'error' && response.message === 'File was marked completed but is now missing.')) {
+                        console.log(`Item ${item.unique_id} (${item.searchQuery}) considered gone (status: ${response.status}). Removing from history.`);
                         removeDownloadFromHistory(item.unique_id);
+                    } else {
+                        // Ensure it's still in pendingDownloads map if it's pending, otherwise updateRequestItem handles removal from map for final states
+                        if(response.status === 'pending'){
+                            pendingDownloads.set(item.unique_id, item.searchQuery);
+                        }
+                        updateRequestItem(item.unique_id, item.searchQuery, response.url, response.status, response.message);
                     }
                 },
-                error: function(xhr, status, error) {
-                    console.log("Status check error:", error);
+                error: function(xhr, textStatus, errorThrown) { // jQuery .fail() equivalent
+                    console.log(`Status check AJAX failed for ${item.unique_id} (${item.searchQuery}). Status: ${textStatus}, Error: ${errorThrown}. Removing from history.`);
                     removeDownloadFromHistory(item.unique_id);
                 }
             });
         });
     };
 
-    // Save download to user's storage
-    const saveDownload = (unique_id, searchQuery, url) => {
-        const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
-        const filteredDownloads = userDownloads.filter(d => d.unique_id !== unique_id);
-        filteredDownloads.push({ unique_id, searchQuery, url });
-        localStorage.setItem('userDownloads', JSON.stringify(filteredDownloads));
+    // Save download to user's storage - include status and message
+    const saveDownload = (unique_id, searchQuery, url, status = 'pending', message = '') => {
+        let userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
+        const existingIndex = userDownloads.findIndex(d => d.unique_id === unique_id);
+
+        const newItem = { 
+            unique_id, 
+            searchQuery, 
+            url, 
+            status, 
+            message: message || '', // Ensure message is not undefined
+            timestamp: new Date().toISOString() 
+        };
+
+        if (existingIndex > -1) {
+            userDownloads[existingIndex] = newItem;
+        } else {
+            userDownloads.push(newItem);
+        }
+        
+        userDownloads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        localStorage.setItem('userDownloads', JSON.stringify(userDownloads));
     };
 
     // Clear user's download history
@@ -82,13 +101,19 @@ $(document).ready(function () {
     });
 
     socket.on('download_complete', function(data) {
-        console.log('Download complete:', data);
+        console.log('Download complete event:', data);
         if (pendingDownloads.has(data.unique_id)) {
             const searchQuery = pendingDownloads.get(data.unique_id);
-            updateRequestItem(data.unique_id, searchQuery, data.url);
-            saveDownload(data.unique_id, searchQuery, data.url);
-            pendingDownloads.delete(data.unique_id);
+            updateRequestItem(data.unique_id, searchQuery, data.url, 'completed');
+            // saveDownload is called by updateRequestItem for 'completed'
         }
+    });
+
+    socket.on('download_failed', function(data) {
+        console.log('Download failed event:', data);
+        // data should contain unique_id, message, search_query, zip_url
+        updateRequestItem(data.unique_id, data.search_query, data.zip_url, 'failed', data.message);
+        notificationSystem.error('Download Failed', `${data.search_query || 'Item'}: ${data.message}`);
     });
 
     socket.on('download_status', function(data) {
@@ -128,53 +153,78 @@ $(document).ready(function () {
     });
 
     // Update request item in UI with better status handling
-    const updateRequestItem = (requestId, searchQuery, url) => {
-        console.log('Updating request item:', requestId, searchQuery, url);
-        $.ajax({
-            url: `/status/${requestId}`,
-            method: 'GET',
-            success: function(response) {
-                console.log('Status response:', response);
-                const existingItem = $(`#${requestId}`);
-                
-                if (!existingItem.length) {
-                    console.log('Item not found in DOM');
-                    return;
-                }
+    const updateRequestItem = (requestId, searchQuery, url, status, message = '') => {
+        console.log('Updating request item:', requestId, searchQuery, status, url, message);
+        const existingItem = $(`#${requestId}`);
+        
+        if (!existingItem.length) {
+            console.log('Item not found in DOM for update:', requestId);
+            // If item doesn't exist, and it's a final state, maybe add it if it's from a socket event
+            // For now, assume loadDownloadHistory creates the initial item.
+            return; 
+        }
 
-                switch(response.status) {
-                    case 'completed':
-                        existingItem.find('span').text(`${searchQuery} (Completed)`);
-                        existingItem.find('.spinner-border').remove();
-                        if (!existingItem.find('.btn-success').length) {
-                            existingItem.append(`
-                                <button class="btn btn-success" onclick="startDownload('${url}', '${searchQuery}', '${requestId}')">Download</button>
-                            `);
-                        }
-                        break;
-                    case 'pending':
-                        console.log('Download still pending');
-                        existingItem.find('span').text(`${searchQuery} (Pending)`);
-                        if (!existingItem.find('.spinner-border').length) {
-                            existingItem.append('<div class="spinner-border" role="status"></div>');
-                        }
-                        break;
-                    case 'missing_file':
-                        // Only remove if the server specifically says the file is missing
-                        console.log('File is missing, removing from history');
-                        removeDownloadFromHistory(requestId);
-                        break;
-                    default:
-                        console.log('Unexpected status:', response.status);
-                        // Don't remove for unknown statuses
-                        break;
+        existingItem.find('.spinner-border').remove();
+        let statusText = searchQuery || 'Download'; // Fallback if searchQuery is undefined
+        let buttons = '';
+        let statusClass = '';
+
+        switch(status) {
+            case 'completed':
+                statusText = `${searchQuery} (<span style="color: green;">Completed</span>)`;
+                statusClass = 'list-group-item-success';
+                if (url) {
+                    buttons = `<button class="btn btn-success btn-sm ms-2" onclick="startDownload('${url}', '${searchQuery}.zip', '${requestId}')">Download</button>`;
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Status check failed:', error);
-                // Don't remove on error - might be temporary server issue
-            }
-        });
+                pendingDownloads.delete(requestId);
+                saveDownload(requestId, searchQuery, url, 'completed', message); 
+                break;
+            case 'pending':
+                statusText = `${searchQuery} (Pending)`;
+                statusClass = 'list-group-item-info';
+                existingItem.append(' <div class="spinner-border spinner-border-sm" role="status"></div>');
+                pendingDownloads.set(requestId, searchQuery); // Ensure it's in pending map
+                // saveDownload is typically called on initiation for 'pending'
+                break;
+            case 'failed':
+                statusText = `${searchQuery} (<span style="color: red;">Failed</span>)`;
+                if (message) {
+                    statusText += ` <small class="text-muted">(${message})</small>`;
+                }
+                statusClass = 'list-group-item-danger';
+                if (url) { // URL to the zip containing error.txt
+                    buttons = `<button class="btn btn-warning btn-sm ms-2" onclick="startDownload('${url}', '${searchQuery}_error.zip', '${requestId}')">Error Log</button>`;
+                }
+                // Add a retry button that calls a global retry function
+                buttons += ` <button class="btn btn-info btn-sm ms-2" onclick="handleRetry('${requestId}', '${searchQuery}')">Retry</button>`;
+                pendingDownloads.delete(requestId);
+                saveDownload(requestId, searchQuery, url, 'failed', message);
+                break;
+            case 'error': // e.g. status check failed
+                 statusText = `${searchQuery} (<span style="color: orange;">Error</span>)`;
+                 if (message) statusText += ` <small class="text-muted">(${message})</small>`;
+                 statusClass = 'list-group-item-warning';
+                 pendingDownloads.delete(requestId);
+                 saveDownload(requestId, searchQuery, url, 'error', message);
+                 break;
+            default: // e.g. 'not_found' or other unexpected
+                statusText = `${searchQuery} (<span style="color: grey;">${status || 'Unknown'}</span>)`;
+                if (message) statusText += ` <small class="text-muted">(${message})</small>`;
+                statusClass = 'list-group-item-light';
+                pendingDownloads.delete(requestId);
+                // removeDownloadFromHistory(requestId); // Or let user clear manually
+                saveDownload(requestId, searchQuery, url, status, message);
+                break;
+        }
+
+        existingItem.find('span:first').html(statusText);
+        existingItem.removeClass('list-group-item-success list-group-item-info list-group-item-danger list-group-item-warning list-group-item-light').addClass(statusClass);
+        
+        // Remove old buttons before adding new ones
+        existingItem.find('button').remove();
+        if (buttons) {
+            existingItem.append(buttons);
+        }
     };
 
     // Add new function to remove download from history
@@ -214,23 +264,77 @@ $(document).ready(function () {
             lyrics_format: lyricsFormat,
             output_format: outputFormat
         })
-        .done(function(data) {
-            if (data.status === 'success' && data.unique_id) {
-                pendingDownloads.set(data.unique_id, searchQuery);
-                saveDownload(data.unique_id, searchQuery);
-                
-                const requestItem = `<li id="${data.unique_id}">
+        .done(function(responseData, textStatus, jqXHR) { // Renamed data to responseData for clarity
+            console.log("Search POST .done() reached. HTTP Status:", jqXHR.status, "textStatus:", textStatus);
+            console.log("Raw responseText from server:", jqXHR.responseText);
+            console.log("jQuery parsed 'responseData' object:", responseData);
+
+            let actualData = null;
+
+            // Check if responseData is an array and the first element is the expected object
+            if (Array.isArray(responseData) && responseData.length > 0 && 
+                typeof responseData[0] === 'object' && responseData[0] !== null && 
+                responseData[0].hasOwnProperty('status') && responseData[0].hasOwnProperty('unique_id')) {
+                console.log("responseData is an array, using responseData[0] as actualData.");
+                actualData = responseData[0];
+            } else if (typeof responseData === 'object' && responseData !== null) { // Standard object response
+                console.log("responseData is an object, using it as actualData.");
+                actualData = responseData;
+            }
+
+            if (actualData && actualData.status === 'success' && actualData.unique_id) {
+                console.log("Successfully processed: unique_id =", actualData.unique_id, "searchQuery =", searchQuery);
+                pendingDownloads.set(actualData.unique_id, searchQuery);
+                saveDownload(actualData.unique_id, searchQuery, null, 'pending');
+
+                const requestItem = `<li id="${actualData.unique_id}" class="list-group-item list-group-item-info">
                     <span>${searchQuery} (Pending)</span>
-                    <div class="spinner-border" role="status"></div>
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
                 </li>`;
-                $("#requests-list").append(requestItem);
+                $("#requests-list").prepend(requestItem);
+                notificationSystem.success('Request Sent', `Download for "${searchQuery}" has been initiated.`);
+
+            } else {
+                let specificMessage = 'Server sent a 2xx response, but the data format was unexpected or incomplete.';
+                if (actualData && actualData.message) { // If server sent a 2xx with its own error message in the processed data
+                    specificMessage = actualData.message;
+                } else if (Array.isArray(responseData)) {
+                    specificMessage = `Server sent a 2xx response, but the expected object was not found in the received array. Array: ${JSON.stringify(responseData).substring(0,100)}...`;
+                } else if (typeof responseData !== 'object' || responseData === null) {
+                    specificMessage = 'Server sent a 2xx response, but the data was not valid JSON, was empty, or an unhandled structure.';
+                } else if (!actualData || !actualData.status || !actualData.unique_id) {
+                    specificMessage = 'Server sent a 2xx response, but "status" or "unique_id" was missing in the processed data.';
+                }
                 
-                incrementDownloadCounter();
+                console.error('Problem in .done(): Unexpected data structure. Original Parsed Data:', responseData, 'Processed actualData:', actualData, 'HTTP Status:', jqXHR.status);
+                notificationSystem.error('Search Error (Client)', specificMessage);
             }
         })
         .fail(function(jqXHR, textStatus, errorThrown) {
-            console.error('Request failed:', errorThrown);
-            notificationSystem.error('Error', 'Failed to start download. Please try again.');
+            console.error('Request failed. Status:', jqXHR.status, 'Response:', jqXHR.responseText, 'Error:', errorThrown);
+            let message = 'Failed to start download. Please try again.'; // Ensure default message is always set
+            
+            if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                message = jqXHR.responseJSON.message;
+            } else if (jqXHR.status === 429) {
+                message = 'Too many requests. Please try again later.';
+            } else if (jqXHR.status === 0) {
+                message = 'Network error or server unreachable. Please check your connection.';
+            } else if (jqXHR.responseText) { // Fallback to responseText if no JSON message
+                // Try to parse as text, could be HTML error page or plain text
+                // Avoid showing full HTML pages as notifications
+                if (jqXHR.responseText.length < 200 && !jqXHR.responseText.trim().startsWith('<')) {
+                    message = jqXHR.responseText;
+                } else {
+                    message = `Server returned status ${jqXHR.status}. Please check server logs.`;
+                }
+            }
+            // If message is still the default and errorThrown has info, append it.
+            else if (message === 'Failed to start download. Please try again.' && errorThrown) {
+                message = `Failed to start download: ${errorThrown}`;
+            }
+
+            notificationSystem.error('Error', message);
         });
 
         $("#search_query").val('');
@@ -266,6 +370,24 @@ $(document).ready(function () {
                 removeDownloadFromHistory(unique_id);
             }
         });
+    };
+
+    // Global function for retrying downloads
+    window.handleRetry = function(uniqueId, searchQuery) {
+        console.log("Retrying download for:", uniqueId, searchQuery);
+        notificationSystem.info('Retrying...', `Preparing to retry download for ${searchQuery}.`);
+
+        // 1. Remove the old item from UI and localStorage to avoid duplicate unique_ids if server reuses or if we want a fresh start
+        removeDownloadFromHistory(uniqueId); // This also removes from pendingDownloads map
+
+        // 2. Set the search query in the input field
+        $("#search_query").val(searchQuery);
+        // TODO: Potentially restore other form fields (audio_format, etc.) if they were specific to this download.
+        // This might require storing them with the download item in localStorage.
+        // For now, it will use current form values.
+
+        // 3. Trigger the download initiation logic
+        initiateDownload();
     };
 
     // Event handlers
