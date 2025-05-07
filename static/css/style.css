@@ -251,8 +251,28 @@ button:hover {
     margin-top: 10px;
     display: flex;
     align-items: center;
+    justify-content: flex-start; /* Ensure content is aligned to the left */
     gap: 5px;
     font-size: 0.8em;
+}
+
+.notification-checkbox input[type="checkbox"] {
+    width: auto;  /* Override global input width: 100% */
+    padding: 0;   /* Override global input padding */
+    margin: 0;    /* Reset any default/global margins */
+    flex-shrink: 0; /* Prevent checkbox from shrinking */
+    /* border: none; /* Optionally remove border if it adds too much space */
+    /* background: transparent; /* Optionally reset background */
+}
+
+.notification-checkbox label {
+    margin-bottom: 0; /* Reset margin from general label style */
+    flex-grow: 1;     /* Allow label to take available space */
+    min-width: 0;     /* Allows the label to shrink and wrap if its content is too long */
+    overflow-wrap: break-word; /* Ensure text wraps */
+    text-align: left; /* Explicitly align text to the left within the label */
+    padding: 0;       /* Reset padding for the label if necessary */
+    /* font-weight: normal; /* Reset font-weight if inherited strangely */
 }
 
 .footer {

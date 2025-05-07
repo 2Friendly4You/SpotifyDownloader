@@ -1,4 +1,4 @@
-const notificationSystem = {
+    const notificationSystem = {
     show: function(options) {
         const {
             title,
@@ -71,6 +71,6 @@ const notificationSystem = {
     }
 };
 
-const showAlert = async (title, text, storageKey) => {
-    await notificationSystem.info(title, text, storageKey);
+const showAlert = (title, text, storageKey) => {
+    notificationSystem.info(title, text, storageKey);
 };
