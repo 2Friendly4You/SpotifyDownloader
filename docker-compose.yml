@@ -9,8 +9,6 @@ services:
       - spotifydownloader-redis
     volumes_from:
       - spotifydownloader-data
-    volumes:
-      - ./music:/var/www/SpotifyDownloader:rw
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production
@@ -55,8 +53,9 @@ services:
     volumes_from:
       - spotifydownloader-data
     environment:
-      - RETENTION_DAYS=14  # Set retention period in days
-      - CLEANUP_INTERVAL=86400  # Cleanup check interval in seconds (default: 24h)
-    depends_on:
-      - spotifydownloader-data
+      - RETENTION_DAYS=${CLEANUP_RETENTION_DAYS:-14} # Default to 14 days if not set
+      - AGE_CLEANUP_INTERVAL=${AGE_CLEANUP_INTERVAL:-86400} # Default to 24 hours if not set (renamed from CLEANUP_INTERVAL)
+      - MAX_MUSIC_DIR_SIZE_MB=${MAX_MUSIC_DIR_SIZE_MB:-0} # Default to 0 (no limit) if not set
+      - CLEANUP_TARGET_PERCENTAGE=${CLEANUP_TARGET_PERCENTAGE:-90} # Default to 90% if not set
+      - SIZE_CHECK_INTERVAL=${SIZE_CHECK_INTERVAL:-3600} # Default to 1 hour if not set
     restart: unless-stopped
