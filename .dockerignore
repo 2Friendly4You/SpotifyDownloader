@@ -1,0 +1,31 @@
+# Ignore the music directory
+music/
+
+# Ignore Docker related files if they are not needed in the image itself
+Dockerfile
+Dockerfile.cleanup
+docker-compose.yml
+
+# Ignore Git directory
+.git/
+
+# Ignore Python virtual environments
+venv/
+.venv/
+env/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore IDE/editor specific files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Ignore OS specific files
+.DS_Store
+Thumbs.db
