@@ -334,13 +334,6 @@ def download_from_youtube(unique_id, url, output_format):
 # Route Handlers
 # ===============================
 
-@app.before_request
-def log_request_info():
-    # This general request logger is removed as per new requirement
-    # to only log specific /search route details.
-    pass
-
-
 @app.after_request
 def log_response_info(response):
     # This general response logger is modified to only log /search details
@@ -386,6 +379,10 @@ def search():
     # Validate inputs
     if not search_query:
         return jsonify({'status': 'error', 'message': 'Search query is required'}), 400
+    
+    # Check if the search query is longer than 2000 characters
+    if len(search_query) > 2000:
+        return jsonify({'status': 'error', 'message': 'Search query is too long'}), 400
 
     if is_youtube_url(search_query):
         if not output_format in VALID_OUTPUT_FORMATS:
