@@ -17,8 +17,12 @@ services:
       # MAX_PENDING_REQUESTS is now primarily managed via the Admin Panel / Redis.
       # The .env file can provide an initial default if Redis is empty.
       - MAX_PENDING_REQUESTS=${MAX_PENDING_REQUESTS:-5} # Default to 5 if not set in .env
-      # RETENTION_DAYS for app.py (used for Redis expiry) should align with cleanup service
-      - CLEANUP_RETENTION_DAYS=${CLEANUP_RETENTION_DAYS:-14} # Pass from .env, default 14 days
+      # Pass all cleanup-related env vars to the app service as well so admin panel can display them
+      - CLEANUP_RETENTION_DAYS=${CLEANUP_RETENTION_DAYS:-14}
+      - AGE_CLEANUP_INTERVAL=${AGE_CLEANUP_INTERVAL:-86400}
+      - MAX_MUSIC_DIR_SIZE_MB=${MAX_MUSIC_DIR_SIZE_MB:-0}
+      - CLEANUP_TARGET_PERCENTAGE=${CLEANUP_TARGET_PERCENTAGE:-90}
+      - SIZE_CHECK_INTERVAL=${SIZE_CHECK_INTERVAL:-3600}
     restart: unless-stopped
 
   spotifydownloader-nginx:
