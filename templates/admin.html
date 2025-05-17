@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - SpotifyDownloader</title>
+    {# Link to the main stylesheet first for potential overrides or shared styles #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {# Link to the specific admin stylesheet #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel</h1>
+        {% if not session.get('admin_logged_in') %}
+            <form method="POST" class="login-form">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+                <button type="submit">Login</button>
+            </form>
+            {% if error %}
+                <p class="error">{{ error }}</p>
+            {% endif %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <p class="{{ category }}">{{ message }}</p>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        {% else %}
+            <div class="logout-link">
+                <a href="{{ url_for('admin_logout') }}">Logout</a>
+            </div>
+            
+            <div class="admin-section">
+                <h3>Last 50 Search Requests</h3>
+                <div id="last-requests">
+                    {% if last_requests %}
+                        <ul>
+                            {% for req in last_requests %}
+                                <li>
+                                    <span class="timestamp">{{ req.timestamp }}</span> - 
+                                    <span class="ip">IP: {{ req.ip }}</span> - 
+                                    Query: <span class="query">"{{ req.search_query }}"</span>
+                                    (Audio: {{ req.audio_format if req.audio_format else 'N/A' }}, 
+                                     Lyrics: {{ req.lyrics_format if req.lyrics_format else 'N/A' }}, 
+                                     Format: {{ req.output_format if req.output_format else 'N/A' }})
+                                    - Status: <span class="status-code status-{{ req.status_code }}">{{ req.status_code }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>No search requests logged yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>Set Concurrent Request Limit</h3>
+                <form method="POST" action="{{ url_for('admin_set_limit') }}">
+                    <label for="concurrent_limit">Allowed Concurrent Requests:</label>
+                    <input type="number" id="concurrent_limit" name="concurrent_limit" value="{{ current_limit }}" min="1" required>
+                    <button type="submit">Set Limit</button>
+                </form>
+                {% if limit_message %}
+                    <p class="message">{{ limit_message }}</p>
+                {% endif %}
+            </div>
+
+            <div class="admin-section">
+                <h3>Storage Management</h3>
+                <form method="POST" action="{{ url_for('admin_delete_zips') }}" onsubmit="return confirm('Are you sure you want to delete all ZIP files in the music directory? This action cannot be undone.');">
+                    <button type="submit" class="danger-button">Delete All ZIP Files</button>
+                </form>
+            </div>
+
+            <div class="admin-section">
+                <h3>Running Download Tasks</h3>
+                <div id="running-requests">
+                    {% if running_requests %}
+                        <ul>
+                            {% for req_id in running_requests %}
+                                <li>Request ID: {{ req_id }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>No download tasks currently running.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>Other Useful Information</h3>
+                <div id="other-info">
+                    <h4>Storage Information</h4>
+                    {% if useful_info.storage_info_error %}
+                        <p class="error">Error getting storage info: {{ useful_info.storage_info_error }}</p>
+                    {% else %}
+                        <p><strong>Music Directory Path:</strong> <code>{{ useful_info.music_dir_path }}</code></p>
+                        <p><strong>Music Directory Used Space:</strong> {{ useful_info.music_dir_used_space_mb }} MB</p>
+                        <p><strong>ZIP Files in Music Directory:</strong> {{ useful_info.music_dir_zip_count }}</p>
+                        <p><strong>Partition Total Space:</strong> {{ useful_info.partition_total_space_gb }} GB</p>
+                        <p><strong>Partition Free Space:</strong> {{ useful_info.partition_free_space_gb }} GB</p>
+                    {% endif %}
+
+                    <h4>Application Configuration</h4>
+                    <p><strong>Effective Concurrent Download Limit:</strong> {{ useful_info.max_pending_requests_effective }}</p>
+                    <p><strong>Redis Status:</strong> <span class="status-{{ useful_info.redis_status.lower().replace(' ', '-') }}">{{ useful_info.redis_status }}</span></p>
+                    
+                    <h4>Cleanup Service Configuration (from Environment)</h4>
+                    <p><strong>File Retention Days (<code>CLEANUP_RETENTION_DAYS</code>):</strong> {{ useful_info.cleanup_retention_days }} days</p>
+                    <p><strong>Age Cleanup Interval (<code>AGE_CLEANUP_INTERVAL</code>):</strong> {{ useful_info.cleanup_age_interval }} seconds</p>
+                    <p><strong>Max Music Directory Size (<code>MAX_MUSIC_DIR_SIZE_MB</code>):</strong> {{ useful_info.cleanup_max_dir_size_mb }} MB (0 means disabled)</p>
+                    <p><strong>Cleanup Target Percentage (<code>CLEANUP_TARGET_PERCENTAGE</code>):</strong> {{ useful_info.cleanup_target_percentage }}%</p>
+                    <p><strong>Size Check Interval (<code>SIZE_CHECK_INTERVAL</code>):</strong> {{ useful_info.cleanup_size_check_interval }} seconds</p>
+                    <p><small>Note: Admin password is set via the <code>ADMIN_PASSWORD</code> environment variable.</small></p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

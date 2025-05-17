@@ -13,7 +13,12 @@ services:
       - FLASK_APP=app.py
       - FLASK_ENV=production
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
-      - MAX_PENDING_REQUESTS=5
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # MAX_PENDING_REQUESTS is now primarily managed via the Admin Panel / Redis.
+      # The .env file can provide an initial default if Redis is empty.
+      - MAX_PENDING_REQUESTS=${MAX_PENDING_REQUESTS:-5} # Default to 5 if not set in .env
+      # RETENTION_DAYS for app.py (used for Redis expiry) should align with cleanup service
+      - CLEANUP_RETENTION_DAYS=${CLEANUP_RETENTION_DAYS:-14} # Pass from .env, default 14 days
     restart: unless-stopped
 
   spotifydownloader-nginx:

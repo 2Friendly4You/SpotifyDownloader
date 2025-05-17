@@ -1,0 +1,239 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2, h3 {
+    color: #2c3e50;
+    margin-top: 0;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+form {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #ecf0f1;
+    border-radius: 5px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+input[type="password"],
+input[type="number"],
+input[type="text"] {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button[type="submit"] {
+    background-color: #3498db;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+button[type="submit"]:hover {
+    background-color: #2980b9;
+}
+
+.error {
+    color: #e74c3c;
+    background-color: #fdd;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    border: 1px solid #e74c3c;
+}
+
+.message {
+    color: #27ae60;
+    background-color: #e6f7ee;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    border: 1px solid #27ae60;
+}
+
+
+a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+#last-requests ul, #running-requests ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+#last-requests li, #running-requests li {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    word-break: break-all; /* Prevents long strings from breaking layout */
+}
+
+#last-requests .timestamp {
+    font-weight: bold;
+    color: #555;
+}
+
+#last-requests .ip {
+    color: #777;
+}
+
+#last-requests .query {
+    font-style: italic;
+    color: #333;
+}
+
+#last-requests .status-code {
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 3px;
+    color: white;
+}
+
+.status-200, .status-201, .status-202, .status-204 {
+    background-color: #2ecc71; /* Green for success */
+}
+
+.status-304 {
+    background-color: #f39c12; /* Orange for not modified */
+}
+
+.status-400, .status-401, .status-403, .status-404, .status-429 {
+    background-color: #e74c3c; /* Red for client errors */
+}
+
+.status-500, .status-502, .status-503, .status-504 {
+    background-color: #c0392b; /* Darker red for server errors */
+}
+
+.status-connected {
+    color: #2ecc71;
+    font-weight: bold;
+}
+
+.status-disconnected, .status-error-connecting {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.admin-section {
+    background-color: #fdfdfd;
+    border: 1px solid #e0e0e0;
+    padding: 20px;
+    margin-bottom: 25px;
+    border-radius: 6px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+}
+
+.admin-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    color: #34495e;
+}
+
+#other-info h4 {
+    color: #34495e;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+#other-info p {
+    margin: 5px 0 10px 0;
+    line-height: 1.6;
+}
+
+#other-info code {
+    background-color: #eef1f2;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: "Courier New", Courier, monospace;
+    color: #c0392b;
+}
+
+.logout-link {
+    text-align: right;
+    margin-bottom: 20px;
+}
+
+.logout-link a {
+    display: inline-block;
+    padding: 8px 15px;
+    background-color: #e74c3c;
+    color: white;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.logout-link a:hover {
+    background-color: #c0392b;
+    text-decoration: none;
+}
+
+.login-form {
+    max-width: 400px;
+    margin: 50px auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        margin: 10px;
+        padding: 15px;
+    }
+
+    input[type="password"],
+    input[type="number"],
+    input[type="text"] {
+        width: calc(100% - 20px);
+    }
+}
+
+/* Ensure main style.css container does not conflict too much */
+body > .container {
+    max-width: 1000px; /* Keep admin container width controlled */
+}
+
+/* Add a class to body in admin.html if more specific overrides are needed */
+/* e.g. <body class="admin-page"> */

@@ -11,10 +11,12 @@ import threading
 import subprocess
 import zipfile # Added import
 from urllib.parse import urlparse
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, flash # Added session, redirect, url_for, flash
+from flask_socketio import SocketIO, emit
+from datetime import datetime # Added datetime
+from collections import deque # Added deque
 
 import yt_dlp
-from flask import Flask, request, jsonify, render_template
-from flask_socketio import SocketIO, emit
 
 # ===============================
 # Core Configuration
@@ -25,6 +27,11 @@ SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
 if not SECRET_KEY:
     SECRET_KEY = secrets.token_hex(32)
     print("WARNING: Using randomly generated secret key. Set FLASK_SECRET_KEY environment variable for persistence.")
+
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+if not ADMIN_PASSWORD:
+    print("WARNING: ADMIN_PASSWORD environment variable not set. Admin panel will be inaccessible.")
+    ADMIN_PASSWORD = secrets.token_hex(32) # Generate a random one if not set to prevent easy access
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -42,7 +49,20 @@ redis_client = redis.Redis(host='spotifydownloader-redis', port=6379, db=0)
 MUSIC_DIR = "C:/SpotifyDownloader/music/" if platform.system() == 'Windows' else "/var/www/SpotifyDownloader/"
 PENDING_REQUESTS_FILE = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), 'pending_requests.txt')
-MAX_PENDING_REQUESTS = int(os.environ.get('MAX_PENDING_REQUESTS', 5)) # Read from environment or default to 5
+# MAX_PENDING_REQUESTS is now managed via admin panel, default to 5 if not set in Redis
+# MAX_PENDING_REQUESTS = int(os.environ.get('MAX_PENDING_REQUESTS', 5)) 
+
+# Global deque to store last 50 search requests for admin panel
+search_request_log = deque(maxlen=50)
+
+# Key for storing concurrent request limit in Redis
+CONCURRENT_REQUEST_LIMIT_KEY = "concurrent_request_limit"
+
+def get_max_pending_requests():
+    limit = redis_client.get(CONCURRENT_REQUEST_LIMIT_KEY)
+    if limit:
+        return int(limit)
+    return 5 # Default limit
 
 # Valid format options
 VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube',
@@ -100,7 +120,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
     
-    retention_seconds = int(os.getenv('RETENTION_DAYS', 7)) * 86400
+    retention_seconds = int(os.getenv('CLEANUP_RETENTION_DAYS', 7)) * 86400 # Changed 'RETENTION_DAYS' to 'CLEANUP_RETENTION_DAYS'
     # Construct zip_file_path using the download_folder, not its parent
     zip_file_path = os.path.join(MUSIC_DIR, unique_id + ".zip") 
 
@@ -219,7 +239,7 @@ def download_from_youtube(unique_id, url, output_format):
     redis_client.setex(f"pending:{unique_id}", 3600, "1")
     download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
-    retention_seconds = int(os.getenv('RETENTION_DAYS', 7)) * 86400
+    retention_seconds = int(os.getenv('CLEANUP_RETENTION_DAYS', 7)) * 86400 # Changed 'RETENTION_DAYS' to 'CLEANUP_RETENTION_DAYS'
     zip_file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
 
     ydl_opts = {
@@ -314,6 +334,24 @@ def download_from_youtube(unique_id, url, output_format):
 # Route Handlers
 # ===============================
 
+@app.before_request
+def log_request_info():
+    # This general request logger is removed as per new requirement
+    # to only log specific /search route details.
+    pass
+
+
+@app.after_request
+def log_response_info(response):
+    # This general response logger is modified to only log /search details
+    if request.path == '/search' and request.method == 'POST' and 'search_log_data' in request.environ:
+        log_entry = request.environ['search_log_data']
+        log_entry['status_code'] = response.status_code # Capture status code of the /search response
+        search_request_log.append(log_entry)
+        # Clean up from environ to avoid carrying it to other requests if any issue occurs
+        del request.environ['search_log_data'] 
+    return response
+
 
 @app.route('/')
 def index():
@@ -322,8 +360,22 @@ def index():
 
 @app.route('/search', methods=['POST'])
 def search():
+    # Log search attempt details for admin panel (before validation)
+    # We store it in request.environ to add the status code in after_request
+    # This is done early to capture the attempt itself.
+    if request.method == 'POST': # Ensure we only try to log form data for POST
+        request.environ['search_log_data'] = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'ip': request.remote_addr,
+            'search_query': request.form.get('search_query', ''), # Use .get for safety
+            'audio_format': request.form.get('audio_format'),
+            'lyrics_format': request.form.get('lyrics_format'),
+            'output_format': request.form.get('output_format'),
+            'status_code': None # To be filled by after_request
+        }
+
     # Check pending requests
-    if len(get_pending_requests()) >= MAX_PENDING_REQUESTS:
+    if len(get_pending_requests()) >= get_max_pending_requests():
         return jsonify({'status': 'error', 'message': 'Too many requests. Please try again later.'}), 429
 
     search_query = request.form['search_query']
@@ -368,6 +420,156 @@ def search():
         'message': 'Download started',
         'unique_id': unique_id
     }, 202)
+
+
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+    error = None
+    if request.method == 'POST':
+        if 'password' in request.form:
+            if request.form['password'] == ADMIN_PASSWORD:
+                session['admin_logged_in'] = True
+                return redirect(url_for('admin'))
+            else:
+                error = 'Invalid password'
+        # Handling for other POST requests (like setting limit) will be in separate routes
+        # or checked here based on form parameters if preferred.
+
+    if not session.get('admin_logged_in'):
+        return render_template('admin.html', error=error)
+
+    # If logged in, display the admin panel
+    last_searches = list(search_request_log)
+    last_searches.reverse() # Show newest first
+    
+    running_requests_ids = get_pending_requests()
+    current_limit = get_max_pending_requests()
+
+    # Gather useful information
+    useful_info = {}
+    useful_info['music_dir_path'] = MUSIC_DIR
+    try:
+        zip_files = [f for f in os.listdir(MUSIC_DIR) if f.lower().endswith('.zip')]
+        useful_info['music_dir_zip_count'] = len(zip_files)
+        music_dir_size_bytes = sum(os.path.getsize(os.path.join(MUSIC_DIR, f)) for f in os.listdir(MUSIC_DIR) if os.path.isfile(os.path.join(MUSIC_DIR, f)))
+        useful_info['music_dir_used_space_mb'] = round(music_dir_size_bytes / (1024 * 1024), 2)
+        
+        # shutil.disk_usage gives info about the partition MUSIC_DIR is on
+        disk_usage = shutil.disk_usage(MUSIC_DIR)
+        useful_info['partition_total_space_gb'] = round(disk_usage.total / (1024 * 1024 * 1024), 2)
+        useful_info['partition_free_space_gb'] = round(disk_usage.free / (1024 * 1024 * 1024), 2)
+    except Exception as e:
+        app.logger.error(f"Error gathering storage info: {e}")
+        useful_info['storage_info_error'] = str(e)
+
+    useful_info['cleanup_retention_days'] = os.getenv('CLEANUP_RETENTION_DAYS', '14') # Default from compose/app.py
+    useful_info['max_pending_requests_effective'] = current_limit
+    try:
+        useful_info['redis_status'] = "Connected" if redis_client.ping() else "Connection Failed"
+    except redis.exceptions.ConnectionError:
+        useful_info['redis_status'] = "Connection Error"
+    
+    useful_info['cleanup_age_interval'] = os.getenv('AGE_CLEANUP_INTERVAL', '86400')
+    useful_info['cleanup_max_dir_size_mb'] = os.getenv('MAX_MUSIC_DIR_SIZE_MB', '0')
+    useful_info['cleanup_target_percentage'] = os.getenv('CLEANUP_TARGET_PERCENTAGE', '90')
+    useful_info['cleanup_size_check_interval'] = os.getenv('SIZE_CHECK_INTERVAL', '3600')
+
+    return render_template('admin.html', 
+                           last_requests=last_searches, 
+                           running_requests=running_requests_ids,
+                           current_limit=current_limit,
+                           useful_info=useful_info) # Pass new info
+
+@app.route('/admin/delete_zips', methods=['POST'])
+def admin_delete_zips():
+    if not session.get('admin_logged_in'):
+        flash('You must be logged in to perform this action.', 'error')
+        return redirect(url_for('admin'))
+
+    deleted_count = 0
+    error_count = 0
+    try:
+        for filename in os.listdir(MUSIC_DIR):
+            if filename.lower().endswith('.zip'):
+                file_path = os.path.join(MUSIC_DIR, filename)
+                try:
+                    os.remove(file_path)
+                    deleted_count += 1
+                    app.logger.info(f"Admin deleted ZIP file: {file_path}")
+                except Exception as e:
+                    error_count += 1
+                    app.logger.error(f"Error deleting ZIP file {file_path}: {e}")
+        
+        if error_count > 0:
+            flash(f'Successfully deleted {deleted_count} ZIP files. Failed to delete {error_count} files. Check logs for details.', 'warning')
+        else:
+            flash(f'Successfully deleted {deleted_count} ZIP files from the music directory.', 'success')
+    except Exception as e:
+        flash(f'An error occurred while trying to delete ZIP files: {e}', 'error')
+        app.logger.error(f"Error in admin_delete_zips: {e}")
+    
+    return redirect(url_for('admin'))
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin'))
+
+@app.route('/admin/set_limit', methods=['POST'])
+def admin_set_limit():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin')) # Or return 403 Forbidden
+
+    new_limit = request.form.get('concurrent_limit')
+    limit_message = ''
+    if new_limit and new_limit.isdigit() and int(new_limit) > 0:
+        redis_client.set(CONCURRENT_REQUEST_LIMIT_KEY, int(new_limit))
+        limit_message = f"Concurrent request limit updated to {new_limit}."
+        # Optionally, re-render admin page with a success message
+        # Or redirect back to admin, which will pick up the new limit
+    else:
+        limit_message = "Invalid limit value provided."
+        # Re-render with error or redirect
+    
+    # For simplicity, redirect back to admin; the message can be passed via session/flash if needed
+    # Or, re-render the admin template directly with the message
+    last_searches = list(search_request_log)
+    last_searches.reverse()
+    running_requests_ids = get_pending_requests()
+    current_limit = get_max_pending_requests()
+    # Re-gather useful_info for the re-render after setting limit
+    useful_info = {}
+    useful_info['music_dir_path'] = MUSIC_DIR
+    try:
+        zip_files = [f for f in os.listdir(MUSIC_DIR) if f.lower().endswith('.zip')]
+        useful_info['music_dir_zip_count'] = len(zip_files)
+        music_dir_size_bytes = sum(os.path.getsize(os.path.join(MUSIC_DIR, f)) for f in os.listdir(MUSIC_DIR) if os.path.isfile(os.path.join(MUSIC_DIR, f)))
+        useful_info['music_dir_used_space_mb'] = round(music_dir_size_bytes / (1024 * 1024), 2)
+        disk_usage = shutil.disk_usage(MUSIC_DIR)
+        useful_info['partition_total_space_gb'] = round(disk_usage.total / (1024 * 1024 * 1024), 2)
+        useful_info['partition_free_space_gb'] = round(disk_usage.free / (1024 * 1024 * 1024), 2)
+    except Exception as e:
+        app.logger.error(f"Error gathering storage info for set_limit response: {e}")
+        useful_info['storage_info_error'] = str(e)
+
+    useful_info['cleanup_retention_days'] = os.getenv('CLEANUP_RETENTION_DAYS', '14')
+    useful_info['max_pending_requests_effective'] = current_limit # This is the updated one
+    try:
+        useful_info['redis_status'] = "Connected" if redis_client.ping() else "Connection Failed"
+    except redis.exceptions.ConnectionError:
+        useful_info['redis_status'] = "Connection Error"
+    
+    useful_info['cleanup_age_interval'] = os.getenv('AGE_CLEANUP_INTERVAL', '86400')
+    useful_info['cleanup_max_dir_size_mb'] = os.getenv('MAX_MUSIC_DIR_SIZE_MB', '0')
+    useful_info['cleanup_target_percentage'] = os.getenv('CLEANUP_TARGET_PERCENTAGE', '90')
+    useful_info['cleanup_size_check_interval'] = os.getenv('SIZE_CHECK_INTERVAL', '3600')
+
+    return render_template('admin.html', 
+                           last_requests=last_searches, 
+                           running_requests=running_requests_ids,
+                           current_limit=current_limit,
+                           limit_message=limit_message,
+                           useful_info=useful_info) # Pass new info
 
 
 @app.route('/download_counter', methods=['GET'])
@@ -472,7 +674,7 @@ def notify_client_download_complete(unique_id, download_url):
         'created_at': time.time()
     }
 
-    retention_seconds = int(os.getenv('RETENTION_DAYS', 14)) * 86400
+    retention_seconds = int(os.getenv('CLEANUP_RETENTION_DAYS', 14)) * 86400 # Changed 'RETENTION_DAYS' to 'CLEANUP_RETENTION_DAYS', and default to 14 to match cleanup_service.py
     redis_client.setex(
         f"completed:{unique_id}",
         retention_seconds,
