@@ -259,10 +259,40 @@ button:hover {
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     max-width: 300px;
     animation: slideIn 0.3s ease-out;
+    position: relative;
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.notification-close:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
 }
 
 .notification.success {

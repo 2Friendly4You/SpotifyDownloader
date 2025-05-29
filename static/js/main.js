@@ -264,7 +264,7 @@ $(document).ready(function () {
     window.removeIndividualRequest = function(unique_id) {
         console.log("Removing individual request:", unique_id);
         removeDownloadFromHistory(unique_id);
-        notificationSystem.info('Removed', 'Item removed from the list.');
+        notificationSystem.info('Removed', 'Item removed from the list.', 'hideItemRemoved');
     };
 
     // Handle search form submission
