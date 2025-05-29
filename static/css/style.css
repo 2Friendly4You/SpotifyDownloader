@@ -7,6 +7,8 @@
     --accent: #588d58;
     --input-bg: #ffffff;
     --border-color: #e0e0e0;
+    --danger: #dc3545;
+    --danger-dark: #c82333;
 }
 
 :root[data-theme="dark"] {
@@ -17,6 +19,8 @@
     --accent: #72a772;
     --input-bg: #1a1a1a;
     --border-color: #333333;
+    --danger: #dc3545;
+    --danger-dark: #b02a37;
 }
 
 
@@ -138,6 +142,41 @@ button:hover {
     flex: 1; /* Add this line */
     min-width: 0; /* Add this line */
     overflow-wrap: break-word; /* Add this line */
+}
+
+/* Actions container for buttons and spinner */
+.item-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Close button for individual request items */
+.close-request-btn {
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    padding: 0;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+}
+
+.close-request-btn:hover {
+    background: var(--danger-dark);
+    opacity: 1;
 }
 
 .spinner-border {

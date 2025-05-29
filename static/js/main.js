@@ -18,23 +18,30 @@ $(document).ready(function () {
                     reject(error);
                 });
         });
-    };
-
-    // Update loadDownloadHistory to not remove pending items
+    };    // Update loadDownloadHistory to not remove pending items
     const loadDownloadHistory = () => {
         console.log("Loading download history...");
-        const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]')
+            .sort((a, b) => {
+                // Sort by timestamp descending (newest first), then by unique_id for consistency
+                const timestampDiff = new Date(b.timestamp) - new Date(a.timestamp);
+                return timestampDiff !== 0 ? timestampDiff : b.unique_id.localeCompare(a.unique_id);
+            });
         
-        $("#requests-list").empty();
-        
-        userDownloads.forEach(item => {
+        $("#requests-list").empty();userDownloads.forEach(item => {
             console.log("Loading item from history:", item);
-            // Initial display based on stored status
-            let initialDisplay = `<li id="${item.unique_id}"><span>${item.searchQuery} (${item.status || 'Checking...'})</span>`;
+            // Initial display based on stored status - ensure consistent structure
+            let initialDisplay = `<li id="${item.unique_id}">
+                <span>${item.searchQuery} (${item.status || 'Checking...'})</span>
+                <div class="item-actions">`;
+            
             if (item.status === 'pending') {
-                initialDisplay += ` <div class="spinner-border spinner-border-sm" role="status"></div>`;
+                initialDisplay += `<div class="spinner-border spinner-border-sm" role="status"></div>`;
             }
-            initialDisplay += `</li>`;
+            
+            initialDisplay += `<button class="close-request-btn" onclick="removeIndividualRequest('${item.unique_id}')" title="Remove from list">×</button>
+                </div>
+            </li>`;
             $("#requests-list").append(initialDisplay);
 
             // Then verify/update status with the server
@@ -62,9 +69,7 @@ $(document).ready(function () {
                 }
             });
         });
-    };
-
-    // Save download to user's storage - include status and message
+    };    // Save download to user's storage - include status and message
     const saveDownload = (unique_id, searchQuery, url, status = 'pending', message = '') => {
         let userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
         const existingIndex = userDownloads.findIndex(d => d.unique_id === unique_id);
@@ -75,7 +80,7 @@ $(document).ready(function () {
             url, 
             status, 
             message: message || '', // Ensure message is not undefined
-            timestamp: new Date().toISOString() 
+            timestamp: existingIndex > -1 ? userDownloads[existingIndex].timestamp : new Date().toISOString() // Keep original timestamp if updating
         };
 
         if (existingIndex > -1) {
@@ -84,7 +89,11 @@ $(document).ready(function () {
             userDownloads.push(newItem);
         }
         
-        userDownloads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        // Sort by timestamp descending (newest first), then by unique_id for consistency
+        userDownloads.sort((a, b) => {
+            const timestampDiff = new Date(b.timestamp) - new Date(a.timestamp);
+            return timestampDiff !== 0 ? timestampDiff : b.unique_id.localeCompare(a.unique_id);
+        });
         localStorage.setItem('userDownloads', JSON.stringify(userDownloads));
     };
 
@@ -150,9 +159,7 @@ $(document).ready(function () {
 
     socket.on('reconnect', function() {
         console.log('Reconnected to server');
-    });
-
-    // Update request item in UI with better status handling
+    });    // Update request item in UI with better status handling
     const updateRequestItem = (requestId, searchQuery, url, status, message = '') => {
         console.log('Updating request item:', requestId, searchQuery, status, url, message);
         const existingItem = $(`#${requestId}`);
@@ -164,7 +171,9 @@ $(document).ready(function () {
             return; 
         }
 
+        // Remove any existing spinners first
         existingItem.find('.spinner-border').remove();
+        
         let statusText = searchQuery || 'Download'; // Fallback if searchQuery is undefined
         let buttons = '';
         let statusClass = '';
@@ -182,7 +191,6 @@ $(document).ready(function () {
             case 'pending':
                 statusText = `${searchQuery} (Pending)`;
                 statusClass = 'list-group-item-info';
-                existingItem.append(' <div class="spinner-border spinner-border-sm" role="status"></div>');
                 pendingDownloads.set(requestId, searchQuery); // Ensure it's in pending map
                 // saveDownload is typically called on initiation for 'pending'
                 break;
@@ -215,19 +223,32 @@ $(document).ready(function () {
                 // removeDownloadFromHistory(requestId); // Or let user clear manually
                 saveDownload(requestId, searchQuery, url, status, message);
                 break;
-        }
-
-        existingItem.find('span:first').html(statusText);
+        }        existingItem.find('span:first').html(statusText);
         existingItem.removeClass('list-group-item-success list-group-item-info list-group-item-danger list-group-item-warning list-group-item-light').addClass(statusClass);
         
-        // Remove old buttons before adding new ones
-        existingItem.find('button').remove();
-        if (buttons) {
-            existingItem.append(buttons);
+        // Ensure we have the item-actions container
+        let actionsContainer = existingItem.find('.item-actions');
+        if (!actionsContainer.length) {
+            existingItem.append('<div class="item-actions"></div>');
+            actionsContainer = existingItem.find('.item-actions');
         }
-    };
-
-    // Add new function to remove download from history
+        
+        // Clear the actions container
+        actionsContainer.empty();
+        
+        // Add spinner if pending
+        if (status === 'pending') {
+            actionsContainer.append('<div class="spinner-border spinner-border-sm" role="status"></div>');
+        }
+        
+        // Add action buttons if any
+        if (buttons) {
+            actionsContainer.append(buttons);
+        }
+        
+        // Always add the close button last
+        actionsContainer.append(`<button class="close-request-btn" onclick="removeIndividualRequest('${requestId}')" title="Remove from list">×</button>`);
+    };    // Add new function to remove download from history
     const removeDownloadFromHistory = (unique_id) => {
         console.log("Removing from history:", unique_id);
         const userDownloads = JSON.parse(localStorage.getItem('userDownloads') || '[]');
@@ -237,6 +258,13 @@ $(document).ready(function () {
             $(this).remove();
         });
         pendingDownloads.delete(unique_id);
+    };
+
+    // Global function to remove individual request items
+    window.removeIndividualRequest = function(unique_id) {
+        console.log("Removing individual request:", unique_id);
+        removeDownloadFromHistory(unique_id);
+        notificationSystem.info('Removed', 'Item removed from the list.');
     };
 
     // Handle search form submission
@@ -285,11 +313,12 @@ $(document).ready(function () {
             if (actualData && actualData.status === 'success' && actualData.unique_id) {
                 console.log("Successfully processed: unique_id =", actualData.unique_id, "searchQuery =", searchQuery);
                 pendingDownloads.set(actualData.unique_id, searchQuery);
-                saveDownload(actualData.unique_id, searchQuery, null, 'pending');
-
-                const requestItem = `<li id="${actualData.unique_id}" class="list-group-item list-group-item-info">
+                saveDownload(actualData.unique_id, searchQuery, null, 'pending');                const requestItem = `<li id="${actualData.unique_id}" class="list-group-item list-group-item-info">
                     <span>${searchQuery} (Pending)</span>
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <div class="item-actions">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        <button class="close-request-btn" onclick="removeIndividualRequest('${actualData.unique_id}')" title="Remove from list">×</button>
+                    </div>
                 </li>`;
                 $("#requests-list").prepend(requestItem);
                 notificationSystem.success('Request Sent', `Download for "${searchQuery}" has been initiated.`);
