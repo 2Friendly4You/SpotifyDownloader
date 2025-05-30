@@ -94,7 +94,7 @@ def is_youtube_url(url):
 
 
 def validate_song_title(title):
-    return bool(re.match(r"^[a-zA-Z0-9\s\-'.,!&?=-]+$", title))
+    return bool(re.match(r"^[\w\s\-'.,!&?=-]+$", title, re.UNICODE))
 
 
 def validate_input(input_string):
