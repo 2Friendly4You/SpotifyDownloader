@@ -1,0 +1,74 @@
+{
+    "App": {
+        "appName":"Spotify Downloader"
+    },
+    "SearchFields": {
+        "search": "Suche"
+    },
+    "Requests": {
+        "requests": "Anfragen"
+    },
+    "DownloadCounter": {
+        "downloadCounter": "Download Zähler"
+    },
+    "FAQ": {
+        "title": "FAQ",
+        "questions": [
+            {
+                "q": "Wie lade ich Songs herunter?",
+                "a": "Geben Sie einen Songtitel oder eine direkte Spotify-URL in die Suchleiste ein. Wählen Sie Ihren bevorzugten Audioanbieter, ggf. einen Lyrics-Anbieter und das Ausgabeformat. Klicken Sie dann auf 'Suche'. Sobald die Ergebnisse erscheinen, klicken Sie auf den 'Download'-Button neben dem gewünschten Track oder neben dem Playlist-/Albumcover."
+            },
+            {
+                "q": "Wie lade ich Playlists oder Alben herunter?",
+                "a": "Sie können Playlists oder Alben herunterladen, indem Sie deren Spotify-URL in die Suchleiste eingeben. Die Playlist/das Album muss öffentlich oder zugänglich sein. Nach der Suche erscheint ein Download-Button für die gesamte Playlist/das Album. Das Herunterladen großer Playlists kann viel Zeit in Anspruch nehmen."
+            },
+            {
+                "q": "Was sind Audioanbieter?",
+                "a": "Audioanbieter sind die Quellen, von denen die Audiodateien heruntergeladen werden (nicht direkt von Spotify). Verschiedene Anbieter bieten unterschiedliche Qualität oder Verfügbarkeit. Wenn Sie unsicher sind, ist 'YouTube Music' eine gute Wahl."
+            },
+            {
+                "q": "Was sind Lyrics-Anbieter?",
+                "a": "Lyrics-Anbieter sind die Quellen für Songtexte. Wenn Sie einen Anbieter wählen, werden die Songtexte in die Audiodatei eingebettet (sofern das Format es unterstützt, z.B. MP3, FLAC) oder als separate .lrc-Datei gespeichert."
+            },
+            {
+                "q": "Was sind Ausgabeformate?",
+                "a": "Ausgabeformate bestimmen den Dateityp Ihrer heruntergeladenen Audiodatei (z.B. MP3, FLAC, M4A). MP3 ist weit verbreitet, FLAC bietet verlustfreie Qualität. Wählen Sie je nach Bedarf."
+            },
+            {
+                "q": "Wie stelle ich die beste Audioqualität sicher?",
+                "a": "Für eine potenziell höhere Audioqualität wählen Sie 'YouTube Music' als Audioanbieter und ein verlustfreies Format wie FLAC als Ausgabeformat. Die Qualität hängt jedoch letztlich vom verfügbaren Quellmaterial ab."
+            },
+            {
+                "q": "Was passiert, wenn ein Song nicht heruntergeladen werden kann?",
+                "a": "Wenn ein Song beim gewählten Audioanbieter nicht gefunden oder heruntergeladen werden kann, erhalten Sie eine Benachrichtigung in der UI. Dies kann an der Verfügbarkeit beim Anbieter oder anderen Problemen liegen. Versuchen Sie einen anderen Anbieter oder prüfen Sie die Verfügbarkeit direkt auf der Plattform."
+            },
+            {
+                "q": "Warum steht mein Download lange auf 'ausstehend'?",
+                "a": "'Ausstehend' bedeutet, dass der Song in der Warteschlange ist oder gerade verarbeitet wird. Das Herunterladen und Konvertieren, besonders bei Playlists, kann Zeit in Anspruch nehmen. Bitte haben Sie Geduld. Das System verarbeitet nur eine begrenzte Anzahl gleichzeitiger Downloads, um Stabilität zu gewährleisten."
+            },
+            {
+                "q": "Warum erhalte ich eine Fehlermeldung wie 'Zu viele gleichzeitige Anfragen'?",
+                "a": "Diese Meldung erscheint, wenn der Server die maximale Anzahl gleichzeitiger Downloads aller Nutzer erreicht hat. Das Limit dient der Fairness und Stabilität. Bitte warten Sie einen Moment und versuchen Sie es erneut. Ein Administrator kann dieses Limit konfigurieren."
+            },
+            {
+                "q": "Kann ich Musik mit YouTube-Links herunterladen?",
+                "a": "Ja! Sie können Musik mit YouTube-Links herunterladen. Fügen Sie einfach eine YouTube-Video-URL in die Suchleiste ein, wählen Sie das gewünschte Ausgabeformat und klicken Sie auf 'Suche'. Das System verarbeitet das Video und stellt Ihnen einen Download-Link bereit."
+            }
+        ]
+    },
+    "Disclaimer": "Dieser Spotify Downloader ist nur für den privaten Gebrauch legal. Die Musik darf nicht verteilt oder öffentlich abgespielt werden.",
+    "LanguageSwitcher": {
+        "languageSwitcher": "Sprachwechsel"
+    },
+    "AdminPage": {
+        "adminPage": "Admin Seite",
+        "adminPageDescription": "Dies ist die Admin-Seite. Fügen Sie Admin-Funktionen hier hinzu."
+    },
+    "Footer": {
+        "reportBug": "Fehler melden",
+        "featureRequest": "Feature anfragen",
+        "viewOnGitHub": "Auf GitHub ansehen",
+        "createdBy": "Erstellt mit ❤️ von",
+        "author": "2Friendly4You"
+    }
+}

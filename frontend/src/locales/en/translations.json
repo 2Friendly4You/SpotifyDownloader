@@ -1,0 +1,74 @@
+{
+    "App": {
+        "appName": "Spotify Downloader"
+    },
+    "SearchFields": {
+        "search": "Search"
+    },
+    "Requests": {
+        "requests": "Requests"
+    },
+    "DownloadCounter": {
+        "downloadCounter": "Download Counter"
+    },
+    "FAQ": {
+        "title": "FAQ",
+        "questions": [
+            {
+                "q": "How do I download songs?",
+                "a": "Enter a song title or a direct Spotify URL into the search bar. Select your preferred audio provider, lyrics provider (optional), and output format. Then, click the 'Search' button. Once the results appear, click the 'Download' button next to the desired track or besides the playlist/album art."
+            },
+            {
+                "q": "How do I download playlists or albums?",
+                "a": "You can download playlists or albums by entering their Spotify URL into the search bar. The playlist/album must be public or accessible. After searching, a download button for the entire playlist/album will appear. Note that downloading large playlists can take a significant amount of time."
+            },
+            {
+                "q": "What are Audio Providers?",
+                "a": "Audio Providers are the sources from which the audio is downloaded (it is not directly downloaded from Spotify). Different providers might offer varying quality or availability. If you're unsure, 'YouTube Music' is a good default choice."
+            },
+            {
+                "q": "What are Lyrics Providers?",
+                "a": "Lyrics Providers are the sources for fetching song lyrics. If you choose a provider, the lyrics will be embedded in the downloaded audio file if the format supports it (e.g., MP3, FLAC) or saved as a separate .lrc file."
+            },
+            {
+                "q": "What are Output Formats?",
+                "a": "Output Formats determine the file type of your downloaded audio (e.g., MP3, FLAC, M4A). MP3 is widely compatible, while FLAC offers lossless quality. Choose based on your needs."
+            },
+            {
+                "q": "How can I ensure the best audio quality?",
+                "a": "For potentially higher audio quality, try selecting 'YouTube Music' as the Audio Provider and a lossless format like FLAC as the Output Format. However, quality ultimately depends on the source material available through the provider."
+            },
+            {
+                "q": "What happens if a song cannot be downloaded?",
+                "a": "If a song cannot be found or downloaded from the selected Audio Provider, you will receive a notification in the UI. This could be due to unavailability on the provider or other issues. Try using a different Audio Provider or checking the song's availability directly on the source platform."
+            },
+            {
+                "q": "Why is my download showing as 'pending' for a long time?",
+                "a": "'Pending' means the song is in the queue or currently being processed. Downloading and converting audio, especially for playlists, can take time. Please be patient. The system processes a limited number of downloads concurrently to ensure stability."
+            },
+            {
+                "q": "Why did I get an error like 'Too many concurrent requests'?",
+                "a": "This message appears if the server is currently handling the maximum number of allowed concurrent downloads from all users. The limit is in place to ensure fair usage and server stability. Please wait a few moments and try your request again. An administrator can configure this limit."
+            },
+            {
+                "q": "Can I download music using YouTube links?",
+                "a": "Yes! You can download music using YouTube links. Simply paste a YouTube video URL into the search bar, choose your desired output format, and click 'Search'. The system will process the video and provide you with a download link once ready."
+            }
+        ]
+    },
+    "Disclaimer": "This Spotify downloader is legal for personal use only. The music may not be distributed or played in public.",
+    "LanguageSwitcher": {
+        "languageSwitcher": "Language Switcher"
+    },
+    "AdminPage": {
+        "adminPage": "Admin Page",
+        "adminPageDescription": "This is the admin page. Add admin features here."
+    },
+    "Footer": {
+        "reportBug": "Report Bug",
+        "featureRequest": "Feature Request",
+        "viewOnGitHub": "View on GitHub",
+        "createdBy": "Created with ❤️ by",
+        "author": "2Friendly4You"
+    }
+}

@@ -1,0 +1,101 @@
+.root {
+  margin: 2.5rem 0;
+  padding: 2.5rem 1.5rem;
+  background: var(--secondary);
+  border-radius: 18px;
+  text-align: left;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+  width: 100%;
+}
+
+.root h1 {
+  margin: 0 0 2.5rem 0;
+  font-size: 2.2rem;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.root button {
+  transition: none;
+  transform: none;
+}
+
+.accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.faq-item {
+  background: var(--background);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transition: box-shadow 0.25s, border 0.25s;
+  border: 1.5px solid var(--border-color);
+  overflow: hidden;
+}
+
+.faq-item.open {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+  border: 1.5px solid var(--primary);
+}
+
+.faq-question {
+  width: 100%;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.2rem 1.2rem 0.8rem;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.18s, color 0.18s;
+  position: relative;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+}
+
+.faq-question:hover, .faq-question:focus {
+  background: none;
+  color: var(--text);
+}
+
+.faq-icon {
+  font-size: 2.1rem;
+  margin-left: 1.2rem;
+  color: var(--primary);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.faq-item.open .faq-icon {
+  transform: rotate(180deg) scale(1.15);
+  color: var(--accent);
+}
+
+.faq-answer {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.7s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s;
+  padding: 0 1.2rem;
+  background: var(--background);
+}
+
+.faq-answer.open {
+  padding: 0.5rem 1.2rem 1.3rem 1.2rem;
+  max-height: 400px;
+}
+
+.faq-answer p {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.08rem;
+  line-height: 1.8;
+  letter-spacing: 0.01em;
+}

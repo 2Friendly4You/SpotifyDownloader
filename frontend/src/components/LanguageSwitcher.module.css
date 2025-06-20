@@ -1,0 +1,26 @@
+.root {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    z-index: 1000;
+    background-color: var(--background);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: auto;
+}
+
+.root:hover {
+    background-color: var(--accent);
+    color: var(--background);
+    border: 1px solid var(--accent);
+} 
+
+.root select {
+    width: auto;
+}

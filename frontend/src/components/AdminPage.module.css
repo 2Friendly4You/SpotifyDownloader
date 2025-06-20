@@ -1,0 +1,18 @@
+.root {
+  margin: 2rem auto;
+  padding: 2rem;
+  max-width: 600px;
+  background: var(--secondary);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  text-align: center;
+}
+
+.root h1 {
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+
+.root p {
+  color: var(--text);
+} 
