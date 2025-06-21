@@ -6,10 +6,24 @@
         "search": "Suche"
     },
     "Requests": {
-        "requests": "Anfragen"
+        "requests": "Anfragen",
+        "clearRequests": "Anfragen löschen"
+    },
+    "RequestComponent": {
+        "download": "Download",
+        "delete": "x"
+    },
+    "Alert": {
+        "ok": "OK",
+        "cancel": "Abbrechen",
+        "deleteRequest": "Anfrage löschen",
+        "deleteRequests": "Anfragen löschen",
+        "deleteRequestMessage": "Sind Sie sicher, dass Sie \"{{title}}\" löschen möchten?",
+        "deleteRequestsMessage": "Sind Sie sicher, dass Sie alle Anfragen löschen möchten?"
     },
     "DownloadCounter": {
-        "downloadCounter": "Download Zähler"
+        "downloadCounter": "Download Zähler",
+        "downloadCount": "{{count}} Songs/ Playlists wurden bereits heruntergeladen"
     },
     "FAQ": {
         "title": "FAQ",

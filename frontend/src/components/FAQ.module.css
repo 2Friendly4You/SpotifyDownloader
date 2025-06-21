@@ -1,17 +1,9 @@
 .root {
   margin: 2.5rem 0;
-  padding: 2.5rem 1.5rem;
-  background: var(--secondary);
-  border-radius: 18px;
-  text-align: left;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.07);
-  width: 100%;
 }
 
 .root h1 {
-  margin: 0 0 2.5rem 0;
   font-size: 2.2rem;
-  text-align: center;
   letter-spacing: 0.01em;
 }
 
@@ -50,7 +42,7 @@
   color: var(--text);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 1.2rem 1.2rem 1.2rem 0.8rem;
   cursor: pointer;
   border-radius: 12px;
@@ -58,11 +50,18 @@
   position: relative;
   letter-spacing: 0.01em;
   box-shadow: none;
+  text-align: left;
 }
 
 .faq-question:hover, .faq-question:focus {
   background: none;
   color: var(--text);
+}
+
+.faq-question span:first-child {
+  flex: 1;
+  text-align: left;
+  line-height: 1.4;
 }
 
 .faq-icon {

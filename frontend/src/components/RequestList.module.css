@@ -1,0 +1,26 @@
+.root {
+  margin: 2rem 0;
+}
+
+.root h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--text);
+}
+
+.root ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.root button:hover {
+  filter: brightness(0.9);
+  transform: translateY(-2px);
+  transition: transform 0.3s ease;
+}
+
+.clearButton {
+  color: var(--text);
+  background-color: var(--danger);
+}
