@@ -65,8 +65,7 @@ def get_max_pending_requests():
     return 5 # Default limit
 
 # Valid format options
-VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube',
-                         'slider-kz', 'soundcloud', 'bandcamp', 'piped', 'yt-dlp'}
+VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'soundcloud', 'bandcamp', 'piped', 'yt-dlp'}
 VALID_LYRICS_PROVIDERS = {'musixmatch', 'genius', 'azlyrics', 'synced'}
 VALID_OUTPUT_FORMATS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'}
 
@@ -127,7 +126,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     try:
         command = [
             'spotdl', search_query,
-            '--max-retries', '2',
+            '--max-retries', '4',
             '--audio', audio_format,
             '--format', output_format,
             '--output', download_folder, # spotdl downloads into this folder
@@ -393,14 +392,25 @@ def search():
     ]):
         return jsonify({'status': 'error', 'message': 'Invalid input provided'}), 400
 
-    # Update download counter
-    with open('searches.json', 'r+') as f:
-        searches = json.load(f)
-        searches['total'] += 1
-        searches['last'] = search_query
-        f.seek(0)
-        json.dump(searches, f)
-        f.truncate()
+    # Update download counter (tolerate missing/corrupt file)
+    try:
+        if not os.path.isfile('searches.json'):
+            with open('searches.json', 'w', encoding='utf-8') as f:
+                json.dump({'total': 0, 'last': ''}, f)
+        with open('searches.json', 'r+', encoding='utf-8') as f:
+            try:
+                searches = json.load(f)
+            except Exception as e:
+                app.logger.error(f"Error reading searches.json, resetting to defaults: {e}")
+                searches = {'total': 0, 'last': ''}
+            searches['total'] = int(searches.get('total', 0)) + 1
+            searches['last'] = search_query
+            f.seek(0)
+            json.dump(searches, f)
+            f.truncate()
+    except Exception as e:
+        # Log but don't crash the request
+        app.logger.error(f"Failed to update searches.json: {e}")
 
     # Start download process
     unique_id = str(uuid.uuid4())
@@ -571,8 +581,13 @@ def admin_set_limit():
 
 @app.route('/download_counter', methods=['GET'])
 def download_counter():
-    with open('searches.json', 'r') as f:
-        return str(json.load(f)['total'])
+    try:
+        with open('searches.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return str(int(data.get('total', 0)))
+    except Exception as e:
+        app.logger.error(f"Failed to read searches.json in download_counter: {e}")
+        return str(0)
 
 
 @app.route('/status/<unique_id>', methods=['GET'])
@@ -696,7 +711,10 @@ if __name__ == '__main__':
         open(PENDING_REQUESTS_FILE, 'w').close()
 
     if not os.path.isfile('searches.json'):
-        with open('searches.json', 'w') as f:
-            json.dump({'total': 0, 'last': ''}, f)
+        try:
+            with open('searches.json', 'w', encoding='utf-8') as f:
+                json.dump({'total': 0, 'last': ''}, f)
+        except Exception as e:
+            app.logger.error(f"Could not create searches.json at startup: {e}")
 
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)

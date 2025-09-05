@@ -1,0 +1,20 @@
+[project]
+name = "spotifydownloader"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "eventlet>=0.40.3",
+    "flask>=3.1.2",
+    "flask-limiter>=3.12",
+    "flask-socketio>=5.5.1",
+    "gevent>=25.8.2",
+    "gevent-websocket>=0.10.1",
+    "gunicorn>=23.0.0",
+    "python-engineio>=4.12.2",
+    "python-socketio>=5.13.0",
+    "redis==5.2.1",
+    "spotdl>=4.4.2",
+    "yt-dlp>=2025.8.27",
+]
