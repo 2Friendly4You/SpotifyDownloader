@@ -1,0 +1,25 @@
+.root {
+  margin: 2rem 0;
+  min-width: 0;
+}
+
+.root h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--text);
+}
+
+.root ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.clearButton:hover {
+  filter: brightness(0.92);
+}
+
+.clearButton {
+  color: var(--text);
+  background-color: var(--danger);
+}

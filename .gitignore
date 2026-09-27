@@ -1,29 +1,29 @@
-/templates/download/*
-/pending_requests.txt
-/searches.json
-/music/*
-
-# Environment variables
+# Environment
 .env
+
+# Runtime data
+searches.json
+data/
+pending_requests.txt
+music/
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual Environment
-venv/
 .venv/
+venv/
 env/
 ENV/
-
-# Logs
 *.log
 
-# Runtime data
-*.pid
-*.seed
-*.pid.lock
+# Frontend
+node_modules/
+dist/
 
-# Downloaded music
-music/
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.local

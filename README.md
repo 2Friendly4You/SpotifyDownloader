@@ -1,6 +1,6 @@
 # Spotify Downloader
 
-A web-based application for downloading songs and playlists from Spotify and YouTube. Features a modern, responsive interface with multiple download options and format selections.
+A web-based application for downloading songs and playlists from Spotify and YouTube. Features a React frontend, a Flask API, and multiple download options and format selections.
 
 ## Features
 
@@ -14,7 +14,6 @@ A web-based application for downloading songs and playlists from Spotify and You
 - Multiple audio source providers:
   - YouTube Music (recommended)
   - YouTube
-  - slider.kz
   - SoundCloud
   - Bandcamp
   - Piped
@@ -34,8 +33,18 @@ A web-based application for downloading songs and playlists from Spotify and You
 - Real-time download status updates
 - Download history with persistent storage
 - Dark/Light theme support
-- Rate limiting to prevent abuse
+- English and German translations
+- A cap on how many downloads can run at once
 - Mobile-responsive design
+
+## Project layout
+
+```
+backend/     Flask API, Socket.IO, download workers, in-process cleanup
+frontend/    React + Vite UI
+music/       downloaded zip files (runtime, not committed)
+nginx.conf   reverse proxy in front of the API and the built UI
+```
 
 ## Installation
 
@@ -43,8 +52,9 @@ A web-based application for downloading songs and playlists from Spotify and You
 
 - Docker
 - Docker Compose
-- uv (Python package/dependency manager)
-  - Windows (PowerShell): `iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex`
+- Python 3.14 and pip for local backend development
+- ffmpeg and [Deno](https://deno.land/) (yt-dlp needs a JavaScript runtime for many YouTube downloads)
+- pnpm for local frontend development
 - Git (optional)
 
 ### Quick Start
@@ -55,9 +65,11 @@ git clone https://github.com/2Friendly4You/SpotifyDownloader.git
 cd SpotifyDownloader
 ```
 
-2. Start the application:
+2. Copy `.env.example` to `.env` and set `FLASK_SECRET_KEY` and `ADMIN_PASSWORD`.
+
+3. Start the application:
 ```bash
-docker-compose up -d
+docker compose up --build -d
 ```
 
 The application will be available at `http://localhost:8900`
@@ -81,23 +93,21 @@ To change the exposed port (default: 8900), modify the ports section in `docker-
   spotifydownloader-app:
     environment:
       - FLASK_SECRET_KEY=your_secret_key  # Add a secure secret key
-      - FLASK_ENV=production              # Change to development if needed
+      - ADMIN_PASSWORD=your_admin_password
 ```
 
 #### File Cleanup Configuration
 ```yaml
-  spotifydownloader-cleanup:
+  spotifydownloader-app:
     environment:
-      - RETENTION_DAYS=14        # Number of days to keep files
-      - CLEANUP_INTERVAL=86400   # Cleanup check interval in seconds
+      - CLEANUP_RETENTION_DAYS=14        # Number of days to keep files
+      - AGE_CLEANUP_INTERVAL=86400
 ```
 
 ### Volume Mounts
-The application uses several volume mounts:
-- `./music:/var/www/SpotifyDownloader` - Downloaded music files
-- `./images:/var/www/images` - Image assets
-- `./static:/var/www/static` - Static files
-- `./searches.json:/app/searches.json` - Download statistics
+- `./music` is mounted read-write into the app container and read-only into nginx, which serves the zip files
+- `./data` is mounted into the app container. The download counter is `data/searches.json`, which the app creates on startup
+- `./nginx.conf` is mounted into nginx, so proxy changes apply after a restart
 
 ## Usage
 
@@ -116,50 +126,77 @@ The application uses several volume mounts:
 5. Monitor the download progress in the "Requests" section
 6. Click "Download" when the file is ready
 
+Admin panel: `http://localhost:8900/admin`
+
+## Local development
+
+You can run the API and UI separately.
+
+Backend (from `backend/`):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+$env:MUSIC_DIR="..\music"
+$env:ADMIN_PASSWORD="your_admin_password"
+# Keep --workers 1 so download state and cleanup stay in one process.
+# Docker / Linux:
+gunicorn --worker-class gthread --workers 1 --threads 8 --bind 127.0.0.1:5000 wsgi:app
+# Windows:
+python app.py
+```
+
+Frontend (from `frontend/`):
+
+```powershell
+pnpm install
+pnpm dev
+```
+
+Vite proxies `/api`, `/socket.io`, and `/music` to `http://127.0.0.1:5000`.
+
 ## Docker Commands
 
 ### Start the Application
 ```bash
-docker-compose up -d        # Start in detached mode
-docker-compose up --build   # Rebuild and start
+docker compose up -d        # Start in detached mode
+docker compose up --build   # Rebuild and start
 ```
 
 ### Stop the Application
 ```bash
-docker-compose down         # Stop containers
-docker-compose down -v      # Stop and remove volumes
+docker compose down         # Stop containers
+docker compose down -v      # Stop and remove volumes
 ```
 
 ### View Logs
 ```bash
-docker-compose logs -f                         # All services
-docker-compose logs -f spotifydownloader-app   # Just the app service
+docker compose logs -f                         # All services
+docker compose logs -f spotifydownloader-app   # Just the app service
 ```
 
 ### Container Management
 ```bash
-docker-compose ps          # List containers
-docker-compose restart     # Restart all services
-docker-compose pull        # Update container images
+docker compose ps          # List containers
+docker compose restart     # Restart all services
+docker compose pull        # Update container images
 ```
 
 ## Architecture
 
-The application consists of several Docker containers:
+The application consists of two Docker containers:
 
-- **spotifydownloader-app**: Main Flask application
-- **spotifydownloader-nginx**: Nginx reverse proxy
-- **spotifydownloader-data**: Shared volume container
-- **spotifydownloader-redis**: Redis for request tracking
-- **spotifydownloader-cleanup**: Automatic file cleanup service
+- **spotifydownloader-app**: Flask JSON API, Socket.IO server, download state, and file cleanup
+- **spotifydownloader-nginx**: Serves the React build, proxies `/api` and `/socket.io`, and serves files from `music/`
 
 ## Security Considerations
 
 - Files are automatically deleted after the retention period (default: 14 days)
-- Rate limiting is enabled (1 request per 5 seconds, 10 requests per minute)
+- Concurrent downloads are capped (default: 5, adjustable in the admin panel)
 - Validate all input URLs and search queries
 - Environment variables for sensitive configuration
-- Redis for secure session management
+- In-progress downloads are tracked in the app process; the admin concurrency override is stored in `data/searches.json`
 
 ## Troubleshooting
 
@@ -171,39 +208,15 @@ The application consists of several Docker containers:
 
 2. **File not found after download**
    - Check the retention period hasn't expired
-   - Verify the cleanup service is running correctly
+   - Verify the app process is running so the cleanup thread can delete old files
    - Check disk space availability
    - For YouTube: Video might have been removed or made private
 
-3. **Rate limiting errors**
-   - Wait for the rate limit to reset
-   - Default limits: 1 request/5s, 10 requests/minute
-   - Limits apply to both Spotify and YouTube downloads
+3. **Too many requests**
+   - Wait until a running download finishes
+   - The default cap is 5 downloads at once, and it can be changed in the admin panel
 
 ## Contributing
-## Local development with uv
-
-You can run and manage dependencies without activating a venv manually. uv creates and uses `.venv` automatically based on `pyproject.toml` and `uv.lock`.
-
-- Install or update deps (from lock):
-```powershell
-uv sync
-```
-
-- Run the app locally (eventlet server via gunicorn):
-```powershell
-uv run gunicorn --worker-class eventlet --workers 1 --bind 127.0.0.1:5000 wsgi:app
-```
-
-- Format and lint (add your preferred tools to `[tool.uv].dev-dependencies` if needed):
-```powershell
-# Example once you add tools
-uv run ruff check .
-uv run black .
-```
-
-> Note: The Docker images also use uv. The `uv.lock` file ensures reproducible builds inside containers and locally.
-
 
 1. Fork the repository
 2. Create a feature branch

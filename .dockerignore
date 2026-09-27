@@ -1,31 +1,13 @@
-# Ignore the music directory
-music/
+# Build context for Dockerfile.nginx (repo root).
+# The backend image uses backend/.dockerignore instead.
+*
 
-# Ignore Docker related files if they are not needed in the image itself
-Dockerfile
-Dockerfile.cleanup
-docker-compose.yml
+!frontend/
+!nginx.conf
 
-# Ignore Git directory
-.git/
-
-# Ignore Python virtual environments
-venv/
-.venv/
-env/
-
-# Ignore Python cache files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Ignore IDE/editor specific files
-.vscode/
-.idea/
-*.sublime-workspace
-*.sublime-project
-
-# Ignore OS specific files
-.DS_Store
-Thumbs.db
+frontend/node_modules/
+frontend/dist/
+frontend/README.md
+frontend/eslint.config.js
+frontend/.gitignore
+frontend/_*.mjs
