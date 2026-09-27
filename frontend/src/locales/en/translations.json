@@ -25,7 +25,9 @@
         "remove": "Remove request",
         "retry": "Retry",
         "errorLog": "Error Log",
+        "queuePosition": "Position {{position}}",
         "status": {
+            "queued": "Queued",
             "pending": "Pending",
             "completed": "Completed",
             "failed": "Failed",
@@ -87,12 +89,16 @@
                 "a": "If a song cannot be found or downloaded from the selected Audio Provider, you will receive a notification in the UI. This could be due to unavailability on the provider or other issues. Try using a different Audio Provider or checking the song's availability directly on the source platform."
             },
             {
-                "q": "Why is my download showing as 'pending' for a long time?",
-                "a": "'Pending' means the song is in the queue or currently being processed. Downloading and converting audio, especially for playlists, can take time. Please be patient. The system processes a limited number of downloads concurrently to ensure stability."
+                "q": "Why is my download showing as 'queued'?",
+                "a": "'Queued' means your request was accepted and is waiting for a free download slot. The server only runs a limited number of downloads at once. Your request starts automatically when a running download finishes."
             },
             {
-                "q": "Why did I get an error like 'Too many concurrent requests'?",
-                "a": "This message appears if the server is currently handling the maximum number of allowed concurrent downloads from all users. The limit is in place to ensure fair usage and server stability. Please wait a few moments and try your request again. An administrator can configure this limit."
+                "q": "Why is my download showing as 'pending' for a long time?",
+                "a": "'Pending' means the song is currently being downloaded or converted. Playlists can take several minutes. Please wait until the progress bar finishes."
+            },
+            {
+                "q": "Why did I get an error like 'Download queue is full'?",
+                "a": "This message appears when too many requests are already waiting. The server still accepts new downloads up to the waiting-queue cap. Wait for queued items to start, then try again. An administrator can raise the concurrent download limit so the queue drains faster."
             },
             {
                 "q": "Can I download music using YouTube links?",
@@ -127,8 +133,11 @@
         "deleteZipsSuccess": "ZIP files deleted.",
         "deleteZipsError": "Failed to delete ZIP files.",
         "runningTasks": "Running Download Tasks",
+        "queuedTasks": "Queued Download Tasks",
+        "queuePosition": "Position",
         "requestId": "Request ID",
         "noRunning": "No download tasks currently running.",
+        "noQueued": "No downloads currently waiting in the queue.",
         "otherInfo": "Other Useful Information",
         "storageInfo": "Storage Information",
         "storageError": "Error getting storage info",
@@ -139,6 +148,7 @@
         "partitionFree": "Partition Free Space",
         "appConfig": "Application Configuration",
         "effectiveLimit": "Effective Concurrent Download Limit",
+        "effectiveQueueLimit": "Maximum Queued Downloads",
         "cleanupConfig": "Cleanup Service Configuration (from Environment)",
         "days": "days",
         "seconds": "seconds"

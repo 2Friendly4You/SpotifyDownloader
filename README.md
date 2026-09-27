@@ -194,6 +194,7 @@ The application consists of two Docker containers:
 
 - Files are automatically deleted after the retention period (default: 14 days)
 - Concurrent downloads are capped (default: 5, adjustable in the admin panel)
+- Extra requests wait in a FIFO queue (default cap: 20, `MAX_QUEUED_REQUESTS`)
 - Validate all input URLs and search queries
 - Environment variables for sensitive configuration
 - In-progress downloads are tracked in the app process; the admin concurrency override is stored in `data/searches.json`
@@ -212,9 +213,14 @@ The application consists of two Docker containers:
    - Check disk space availability
    - For YouTube: Video might have been removed or made private
 
-3. **Too many requests**
-   - Wait until a running download finishes
-   - The default cap is 5 downloads at once, and it can be changed in the admin panel
+3. **Downloads stay queued**
+   - Extra songs wait until a running download finishes
+   - The default is 5 downloads at once (admin panel) and 20 waiting requests (`MAX_QUEUED_REQUESTS`)
+
+4. **Download queue is full**
+   - Wait until a queued download starts, then try again
+   - Raise the concurrent limit in the admin panel so waiting jobs start sooner
+   - Raise `MAX_QUEUED_REQUESTS` if you want more songs to wait
 
 ## Contributing
 

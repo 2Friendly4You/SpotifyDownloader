@@ -12,13 +12,25 @@ type StatusResponse = {
   message?: string;
   progress?: number;
   progress_message?: string;
+  position?: number;
 };
 
 type SearchResponse = {
   status?: string;
   message?: string;
   unique_id?: string;
+  queued?: boolean;
+  position?: number | null;
 };
+
+type QueueUpdateEntry = {
+  unique_id: string;
+  position: number;
+};
+
+function cancelQueuedOnServer(uniqueId: string) {
+  void apiFetch(`/api/search/${uniqueId}`, { method: "DELETE" });
+}
 
 type DownloadsContextValue = {
   requests: DownloadRequest[];
@@ -122,13 +134,15 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
           }
           continue;
         }
+        const nextStatus = (result.data.status as RequestStatus) || item.status;
         refreshed.push({
           ...item,
-          status: (result.data.status as RequestStatus) || item.status,
+          status: nextStatus,
           url: result.data.url ?? item.url,
           message: result.data.message || item.message,
           progress: result.data.progress ?? item.progress,
           progressMessage: result.data.progress_message ?? item.progressMessage,
+          queuePosition: nextStatus === "queued" ? result.data.position ?? item.queuePosition : undefined,
         });
       } catch {
         refreshed.push(item);
@@ -157,14 +171,45 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
     socket.on("download_progress", (data: { unique_id: string; progress?: number; message?: string }) => {
       updateRequests((current) =>
         current.map((item) =>
-          item.unique_id === data.unique_id && item.status === "pending"
+          item.unique_id === data.unique_id && (item.status === "pending" || item.status === "queued")
             ? {
                 ...item,
+                status: "pending",
+                queuePosition: undefined,
                 progress: data.progress ?? item.progress,
                 progressMessage: data.message || item.progressMessage,
               }
             : item
         )
+      );
+    });
+
+    socket.on("download_started", (data: { unique_id: string }) => {
+      updateRequests((current) =>
+        current.map((item) =>
+          item.unique_id === data.unique_id
+            ? {
+                ...item,
+                status: "pending",
+                queuePosition: undefined,
+                progress: item.progress ?? 0,
+                progressMessage: item.progressMessage || "Searching",
+              }
+            : item
+        )
+      );
+    });
+
+    socket.on("queue_update", (data: { queue?: QueueUpdateEntry[] }) => {
+      const positions = new Map((data.queue ?? []).map((entry) => [entry.unique_id, entry.position]));
+      updateRequests((current) =>
+        current.map((item) => {
+          if (item.status !== "queued") {
+            return item;
+          }
+          const position = positions.get(item.unique_id);
+          return position === undefined ? item : { ...item, queuePosition: position };
+        })
       );
     });
 
@@ -210,21 +255,29 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       });
 
       if (result.ok && result.data.status === "success" && result.data.unique_id) {
+        const queued = Boolean(result.data.queued);
         upsertRequest({
           unique_id: result.data.unique_id,
           searchQuery: payload.search_query,
           url: null,
-          status: "pending",
+          status: queued ? "queued" : "pending",
           message: "",
-          progress: 0,
-          progressMessage: "Searching",
+          progress: queued ? undefined : 0,
+          progressMessage: queued ? undefined : "Searching",
+          queuePosition: queued ? result.data.position ?? undefined : undefined,
           timestamp: new Date().toISOString(),
           audio_format: payload.audio_format,
           lyrics_format: payload.lyrics_format,
           output_format: payload.output_format,
         });
         setDownloadCount((count) => count + 1);
-        notify("success", "Request Sent", `Download for "${payload.search_query}" has been initiated.`);
+        notify(
+          "success",
+          queued ? "Queued" : "Request Sent",
+          queued
+            ? `Download for "${payload.search_query}" is waiting for a free slot.`
+            : `Download for "${payload.search_query}" has been initiated.`
+        );
         return true;
       }
 
@@ -237,11 +290,24 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
   }, [notify, upsertRequest]);
 
   const removeRequest = useCallback((uniqueId: string) => {
-    updateRequests((current) => current.filter((item) => item.unique_id !== uniqueId));
+    updateRequests((current) => {
+      const existing = current.find((item) => item.unique_id === uniqueId);
+      if (existing?.status === "queued") {
+        cancelQueuedOnServer(uniqueId);
+      }
+      return current.filter((item) => item.unique_id !== uniqueId);
+    });
   }, [updateRequests]);
 
   const clearRequests = useCallback(() => {
-    setRequests([]);
+    setRequests((current) => {
+      for (const item of current) {
+        if (item.status === "queued") {
+          cancelQueuedOnServer(item.unique_id);
+        }
+      }
+      return [];
+    });
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 

@@ -34,6 +34,11 @@ function RequestComponent({
       <p className={styles.status}>
         <Trans i18nKey={`RequestComponent.status.${request.status}`}>{request.status}</Trans>
       </p>
+      {request.status === "queued" && request.queuePosition != null && (
+        <p className={styles.queuePosition}>
+          {t("RequestComponent.queuePosition", { position: request.queuePosition })}
+        </p>
+      )}
       {request.status === "pending" && (
         <div className={styles.progressBlock}>
           <div className={styles.progressMeta}>

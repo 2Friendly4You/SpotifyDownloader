@@ -25,7 +25,9 @@
         "remove": "Anfrage entfernen",
         "retry": "Erneut versuchen",
         "errorLog": "Fehlerprotokoll",
+        "queuePosition": "Position {{position}}",
         "status": {
+            "queued": "In der Warteschlange",
             "pending": "Ausstehend",
             "completed": "Abgeschlossen",
             "failed": "Fehlgeschlagen",
@@ -87,12 +89,16 @@
                 "a": "Wenn ein Song beim gewählten Audioanbieter nicht gefunden oder heruntergeladen werden kann, erhalten Sie eine Benachrichtigung in der UI. Dies kann an der Verfügbarkeit beim Anbieter oder anderen Problemen liegen. Versuchen Sie einen anderen Anbieter oder prüfen Sie die Verfügbarkeit direkt auf der Plattform."
             },
             {
-                "q": "Warum steht mein Download lange auf 'ausstehend'?",
-                "a": "'Ausstehend' bedeutet, dass der Song in der Warteschlange ist oder gerade verarbeitet wird. Das Herunterladen und Konvertieren, besonders bei Playlists, kann Zeit in Anspruch nehmen. Bitte haben Sie Geduld. Das System verarbeitet nur eine begrenzte Anzahl gleichzeitiger Downloads, um Stabilität zu gewährleisten."
+                "q": "Warum steht mein Download auf 'In der Warteschlange'?",
+                "a": "'In der Warteschlange' bedeutet, dass Ihre Anfrage angenommen wurde und auf einen freien Download-Platz wartet. Der Server führt nur eine begrenzte Anzahl Downloads gleichzeitig aus. Ihre Anfrage startet automatisch, sobald ein laufender Download fertig ist."
             },
             {
-                "q": "Warum erhalte ich eine Fehlermeldung wie 'Zu viele gleichzeitige Anfragen'?",
-                "a": "Diese Meldung erscheint, wenn der Server die maximale Anzahl gleichzeitiger Downloads aller Nutzer erreicht hat. Das Limit dient der Fairness und Stabilität. Bitte warten Sie einen Moment und versuchen Sie es erneut. Ein Administrator kann dieses Limit konfigurieren."
+                "q": "Warum steht mein Download lange auf 'ausstehend'?",
+                "a": "'Ausstehend' bedeutet, dass der Song gerade heruntergeladen oder konvertiert wird. Playlists können mehrere Minuten dauern. Bitte warten Sie, bis der Fortschrittsbalken fertig ist."
+            },
+            {
+                "q": "Warum erhalte ich eine Fehlermeldung wie 'Download-Warteschlange ist voll'?",
+                "a": "Diese Meldung erscheint, wenn bereits zu viele Anfragen warten. Der Server nimmt neue Downloads nur bis zur Warteschlangengrenze an. Warten Sie, bis wartende Einträge starten, und versuchen Sie es erneut. Ein Administrator kann das Limit für gleichzeitige Downloads erhöhen, damit die Warteschlange schneller abgearbeitet wird."
             },
             {
                 "q": "Kann ich Musik mit YouTube-Links herunterladen?",
@@ -127,8 +133,11 @@
         "deleteZipsSuccess": "ZIP-Dateien gelöscht.",
         "deleteZipsError": "ZIP-Dateien konnten nicht gelöscht werden.",
         "runningTasks": "Laufende Downloads",
+        "queuedTasks": "Downloads in der Warteschlange",
+        "queuePosition": "Position",
         "requestId": "Anfrage-ID",
         "noRunning": "Derzeit laufen keine Downloads.",
+        "noQueued": "Derzeit warten keine Downloads in der Warteschlange.",
         "otherInfo": "Weitere Informationen",
         "storageInfo": "Speicherinformationen",
         "storageError": "Fehler beim Abrufen der Speicherinformationen",
@@ -139,6 +148,7 @@
         "partitionFree": "Freier Speicher der Partition",
         "appConfig": "Anwendungskonfiguration",
         "effectiveLimit": "Aktives Limit für gleichzeitige Downloads",
+        "effectiveQueueLimit": "Maximale Downloads in der Warteschlange",
         "cleanupConfig": "Konfiguration des Cleanup-Dienstes (aus der Umgebung)",
         "days": "Tage",
         "seconds": "Sekunden"

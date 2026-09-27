@@ -148,6 +148,15 @@
   transition: width 0.3s ease;
 }
 
+.queuePosition {
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.queued {
+  border-color: var(--border-color);
+}
+
 .completed {
   border-color: var(--primary);
 }

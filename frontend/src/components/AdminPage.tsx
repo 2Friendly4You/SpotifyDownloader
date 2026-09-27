@@ -242,6 +242,23 @@ function AdminPage() {
             <Trans i18nKey="AdminPage.noRunning">No download tasks currently running.</Trans>
           </p>
         )}
+        <h4>
+          <Trans i18nKey="AdminPage.queuedTasks">Queued Download Tasks</Trans>
+        </h4>
+        {overview?.queued_requests?.length ? (
+          <ul>
+            {overview.queued_requests.map((id, index) => (
+              <li key={id}>
+                <Trans i18nKey="AdminPage.queuePosition">Position</Trans> {index + 1} —{" "}
+                <Trans i18nKey="AdminPage.requestId">Request ID</Trans>: {id}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>
+            <Trans i18nKey="AdminPage.noQueued">No downloads currently waiting in the queue.</Trans>
+          </p>
+        )}
       </section>
 
       <section className={styles.section}>
@@ -298,6 +315,12 @@ function AdminPage() {
             <Trans i18nKey="AdminPage.effectiveLimit">Effective Concurrent Download Limit</Trans>:
           </strong>{" "}
           {info?.max_pending_requests_effective}
+        </p>
+        <p>
+          <strong>
+            <Trans i18nKey="AdminPage.effectiveQueueLimit">Maximum Queued Downloads</Trans>:
+          </strong>{" "}
+          {info?.max_queued_requests_effective}
         </p>
 
         <h4>
