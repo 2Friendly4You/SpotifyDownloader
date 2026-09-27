@@ -1,30 +1,33 @@
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm AS base
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies needed by yt-dlp/ffmpeg/spotdl and build deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements and install Python packages
-COPY requirements.txt . 
-RUN python -m pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+# Cache dependencies layer by using only lock/config first
+COPY pyproject.toml ./
+# If a lock exists, copy it to enable reproducible installs
+COPY uv.lock ./
+
+# Sync dependencies into a virtualenv at .venv (uv default)
+RUN uv sync --frozen --no-install-project || uv sync --no-install-project
 
 # Copy application code
 COPY . .
 
-# Create directory for downloads
+# Ensure the downloads directory exists
 RUN mkdir -p /var/www/SpotifyDownloader/
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV FLASK_APP=app.py
+ENV PYTHONUNBUFFERED=1 \
+    FLASK_APP=app.py \
+    UV_PROJECT_ENV=.venv
 
 EXPOSE 5000
 
-# Update the CMD to use eventlet worker
-CMD ["gunicorn", "--worker-class", "eventlet", \
-     "--workers", "1", "--bind", "0.0.0.0:5000", "wsgi:app"]
+# Use uv run to launch gunicorn with eventlet worker
+CMD ["uv", "run", "gunicorn", "--worker-class", "eventlet", "--workers", "1", "--bind", "0.0.0.0:5000", "wsgi:app"]

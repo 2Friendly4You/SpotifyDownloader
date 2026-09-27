@@ -1,7 +1,13 @@
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm
 
 WORKDIR /app
 
+# Copy project metadata to allow uv to create a venv (even if no deps used here)
+COPY pyproject.toml ./
+RUN uv sync --no-install-project || true
+
 COPY cleanup_service.py .
 
-CMD ["python", "cleanup_service.py"]
+ENV UV_PROJECT_ENV=.venv
+
+CMD ["uv", "run", "python", "cleanup_service.py"]

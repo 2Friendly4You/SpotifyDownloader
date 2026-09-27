@@ -43,6 +43,8 @@ A web-based application for downloading songs and playlists from Spotify and You
 
 - Docker
 - Docker Compose
+- uv (Python package/dependency manager)
+  - Windows (PowerShell): `iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex`
 - Git (optional)
 
 ### Quick Start
@@ -179,6 +181,29 @@ The application consists of several Docker containers:
    - Limits apply to both Spotify and YouTube downloads
 
 ## Contributing
+## Local development with uv
+
+You can run and manage dependencies without activating a venv manually. uv creates and uses `.venv` automatically based on `pyproject.toml` and `uv.lock`.
+
+- Install or update deps (from lock):
+```powershell
+uv sync
+```
+
+- Run the app locally (eventlet server via gunicorn):
+```powershell
+uv run gunicorn --worker-class eventlet --workers 1 --bind 127.0.0.1:5000 wsgi:app
+```
+
+- Format and lint (add your preferred tools to `[tool.uv].dev-dependencies` if needed):
+```powershell
+# Example once you add tools
+uv run ruff check .
+uv run black .
+```
+
+> Note: The Docker images also use uv. The `uv.lock` file ensures reproducible builds inside containers and locally.
+
 
 1. Fork the repository
 2. Create a feature branch
