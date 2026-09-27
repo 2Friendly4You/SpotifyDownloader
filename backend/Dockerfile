@@ -12,7 +12,8 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py cleanup_service.py wsgi.py ./
+COPY app ./app
+COPY cleanup_service.py wsgi.py run.py ./
 
 RUN mkdir -p /var/www/SpotifyDownloader
 

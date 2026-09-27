@@ -2,9 +2,7 @@ FROM node:26-alpine AS build
 
 WORKDIR /app
 
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-
-RUN corepack enable && corepack prepare pnpm@12.5.0 --activate
+RUN npm install -g pnpm@12.6.0
 
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile

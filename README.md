@@ -144,7 +144,7 @@ $env:ADMIN_PASSWORD="your_admin_password"
 # Docker / Linux:
 gunicorn --worker-class gthread --workers 1 --threads 8 --bind 127.0.0.1:5000 wsgi:app
 # Windows:
-python app.py
+python run.py
 ```
 
 Frontend (from `frontend/`):
