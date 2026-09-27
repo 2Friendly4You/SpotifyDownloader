@@ -1,4 +1,4 @@
-export type RequestStatus = "pending" | "completed" | "failed" | "error";
+export type RequestStatus = "queued" | "pending" | "completed" | "failed" | "error";
 
 export type SearchPayload = {
   search_query: string;
@@ -15,6 +15,7 @@ export type DownloadRequest = {
   message: string;
   progress?: number;
   progressMessage?: string;
+  queuePosition?: number;
   timestamp: string;
   audio_format: string;
   lyrics_format: string;
@@ -40,6 +41,7 @@ export type AdminUsefulInfo = {
   storage_info_error?: string;
   cleanup_retention_days: string;
   max_pending_requests_effective: number;
+  max_queued_requests_effective: number;
   cleanup_age_interval: string;
   cleanup_max_dir_size_mb: string;
   cleanup_target_percentage: string;
@@ -49,6 +51,7 @@ export type AdminUsefulInfo = {
 export type AdminOverview = {
   last_requests: AdminSearchLog[];
   running_requests: string[];
+  queued_requests: string[];
   current_limit: number;
   useful_info: AdminUsefulInfo;
 };

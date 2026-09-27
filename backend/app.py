@@ -68,36 +68,71 @@ def retention_seconds():
 PENDING_TTL_SECONDS = int(os.environ.get('PENDING_TTL_SECONDS', 3600))
 
 
+def load_queue_limit():
+    try:
+        parsed = int(os.environ.get('MAX_QUEUED_REQUESTS', 20))
+    except (TypeError, ValueError):
+        return 20
+    return max(0, parsed)
+
+
 class DownloadState:
-    def __init__(self, concurrent_limit):
+    def __init__(self, concurrent_limit, queue_limit):
         self._lock = threading.Lock()
         self._pending = {}
+        self._queue = deque()
         self._failed = {}
         self._completed = {}
         self._progress = {}
         self._progress_emit = {}
         self._concurrent_limit = concurrent_limit
+        self._queue_limit = queue_limit
 
     def get_limit(self):
         with self._lock:
             return self._concurrent_limit
 
+    def get_queue_limit(self):
+        with self._lock:
+            return self._queue_limit
+
     def set_limit(self, limit):
         with self._lock:
             self._concurrent_limit = limit
+            return self._promote_locked()
 
-    def try_add_pending(self, unique_id):
+    def accept(self, job):
         with self._lock:
-            if len(self._pending) >= self._concurrent_limit:
-                return False
-            self._pending[unique_id] = time.time()
-            return True
+            if len(self._pending) < self._concurrent_limit:
+                self._pending[job['unique_id']] = time.time()
+                return 'started', None
+            if len(self._queue) >= self._queue_limit:
+                return 'full', None
+            self._queue.append(job)
+            return 'queued', len(self._queue)
 
-    def clear_pending(self, unique_id):
+    def release(self, unique_id):
         with self._lock:
             self._pending.pop(unique_id, None)
             self._progress.pop(unique_id, None)
             self._progress_emit.pop(unique_id, None)
+            return self._promote_locked()
+
+    def cancel_queued(self, unique_id):
+        with self._lock:
+            for index, job in enumerate(self._queue):
+                if job['unique_id'] == unique_id:
+                    del self._queue[index]
+                    return True
+            return False
+
+    def _promote_locked(self):
+        promoted = []
+        while self._queue and len(self._pending) < self._concurrent_limit:
+            job = self._queue.popleft()
+            self._pending[job['unique_id']] = time.time()
+            promoted.append(job)
+        return promoted
 
     def update_progress(self, unique_id, percent, message, min_interval=0.4):
         now = time.monotonic()
@@ -142,10 +177,24 @@ class DownloadState:
         with self._lock:
             return list(self._pending)
 
+    def queued_ids(self):
+        with self._lock:
+            return [job['unique_id'] for job in self._queue]
+
+    def queue_snapshot(self):
+        with self._lock:
+            return [
+                {'unique_id': job['unique_id'], 'position': index + 1}
+                for index, job in enumerate(self._queue)
+            ]
+
     def lookup(self, unique_id):
         with self._lock:
             if unique_id in self._pending:
                 return 'pending', None
+            for index, job in enumerate(self._queue):
+                if job['unique_id'] == unique_id:
+                    return 'queued', index + 1
             failed = self._failed.get(unique_id)
             if failed is not None:
                 return 'failed', failed[0]
@@ -176,7 +225,8 @@ class DownloadState:
             self._completed = {
                 key: expires_at for key, expires_at in self._completed.items() if expires_at > now
             }
-            return self._expire_pending_locked(now)
+            timed_out = self._expire_pending_locked(now)
+            return timed_out, self._promote_locked()
 
 
 def read_searches_file():
@@ -242,7 +292,7 @@ def get_max_pending_requests():
     return download_state.get_limit()
 
 
-download_state = DownloadState(load_initial_concurrent_limit())
+download_state = DownloadState(load_initial_concurrent_limit(), load_queue_limit())
 
 
 VALID_AUDIO_PROVIDERS = {'youtube-music', 'youtube', 'soundcloud', 'bandcamp', 'piped', 'yt-dlp'}
@@ -444,7 +494,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             if os.path.exists(download_folder):
                 shutil.rmtree(download_folder)
         finally:
-            download_state.clear_pending(unique_id)
+            start_promoted_jobs(download_state.release(unique_id))
 
 
 def download_from_youtube(unique_id, url, output_format):
@@ -496,7 +546,7 @@ def download_from_youtube(unique_id, url, output_format):
             if os.path.exists(download_folder):
                 shutil.rmtree(download_folder)
         finally:
-            download_state.clear_pending(unique_id)
+            start_promoted_jobs(download_state.release(unique_id))
 
 
 def youtube_progress_hook(unique_id, data):
@@ -515,6 +565,40 @@ def youtube_postprocessor_hook(unique_id, data):
         report_progress(unique_id, None, 'Converting')
     elif 'FFmpegMetadata' in name:
         report_progress(unique_id, None, 'Embedding metadata')
+
+
+def emit_queue_update():
+    socketio.emit('queue_update', {
+        'queue': download_state.queue_snapshot(),
+    }, namespace='/')
+
+
+def start_download_job(job, from_queue=False):
+    unique_id = job['unique_id']
+    if from_queue:
+        socketio.emit('download_started', {
+            'unique_id': unique_id,
+        }, namespace='/')
+    if job.get('is_youtube'):
+        socketio.start_background_task(
+            download_from_youtube, unique_id, job['search_query'], job['output_format']
+        )
+        return
+    socketio.start_background_task(
+        run_spotdl,
+        unique_id,
+        job['search_query'],
+        job['audio_format'],
+        job['lyrics_format'],
+        job['output_format'],
+    )
+
+
+def start_promoted_jobs(jobs):
+    for job in jobs:
+        start_download_job(job, from_queue=True)
+    if jobs:
+        emit_queue_update()
 
 # ===============================
 # Admin helpers
@@ -553,6 +637,7 @@ def gather_storage_info():
 
     useful_info['cleanup_retention_days'] = os.getenv('CLEANUP_RETENTION_DAYS', '14')
     useful_info['max_pending_requests_effective'] = get_max_pending_requests()
+    useful_info['max_queued_requests_effective'] = download_state.get_queue_limit()
 
     useful_info['cleanup_age_interval'] = os.getenv('AGE_CLEANUP_INTERVAL', '86400')
     useful_info['cleanup_max_dir_size_mb'] = os.getenv('MAX_MUSIC_DIR_SIZE_MB', '0')
@@ -567,6 +652,7 @@ def admin_overview_payload():
     return {
         'last_requests': last_searches,
         'running_requests': get_pending_requests(),
+        'queued_requests': download_state.queued_ids(),
         'current_limit': get_max_pending_requests(),
         'useful_info': gather_storage_info(),
     }
@@ -639,23 +725,53 @@ def search():
 
     expire_download_state()
     unique_id = str(uuid.uuid4())
-    if not download_state.try_add_pending(unique_id):
-        return jsonify({'status': 'error', 'message': 'Too many requests. Please try again later.'}), 429
+    job = {
+        'unique_id': unique_id,
+        'search_query': search_query,
+        'audio_format': audio_format,
+        'lyrics_format': lyrics_format,
+        'output_format': output_format,
+        'is_youtube': is_youtube_url(search_query),
+    }
+    outcome, position = download_state.accept(job)
+    if outcome == 'full':
+        return jsonify({
+            'status': 'error',
+            'message': 'Download queue is full. Please try again later.',
+        }), 429
 
     record_search()
 
-    if is_youtube_url(search_query):
-        socketio.start_background_task(download_from_youtube, unique_id, search_query, output_format)
-    else:
-        socketio.start_background_task(
-            run_spotdl, unique_id, search_query, audio_format, lyrics_format, output_format
-        )
+    if outcome == 'started':
+        start_download_job(job)
+        return jsonify({
+            'status': 'success',
+            'message': 'Download started',
+            'unique_id': unique_id,
+            'queued': False,
+            'position': None,
+        }), 202
 
+    emit_queue_update()
     return jsonify({
         'status': 'success',
-        'message': 'Download started',
-        'unique_id': unique_id
+        'message': 'Download queued',
+        'unique_id': unique_id,
+        'queued': True,
+        'position': position,
     }), 202
+
+
+@app.route('/api/search/<unique_id>', methods=['DELETE'])
+def cancel_queued_search(unique_id):
+    if download_state.cancel_queued(unique_id):
+        emit_queue_update()
+        return jsonify({'status': 'success', 'cancelled': True})
+    return jsonify({
+        'status': 'error',
+        'message': 'Request is not queued.',
+        'cancelled': False,
+    }), 404
 
 
 @app.route('/api/admin/login', methods=['POST'])
@@ -739,7 +855,7 @@ def admin_set_limit():
             'message': 'Could not save the limit because searches.json could not be read.',
         }), 500
 
-    download_state.set_limit(parsed)
+    start_promoted_jobs(download_state.set_limit(parsed))
     return jsonify({
         'status': 'success',
         'message': f'Concurrent request limit updated to {parsed}.',
@@ -765,6 +881,12 @@ def download_counter():
 def check_request(unique_id):
     file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
     kind, extra = download_state.lookup(unique_id)
+
+    if kind == 'queued':
+        return jsonify({
+            'status': 'queued',
+            'position': extra,
+        }), 202
 
     if kind == 'pending':
         progress = download_state.get_progress(unique_id)
@@ -807,13 +929,15 @@ def notify_client_download_complete(unique_id, download_url):
 # ===============================
 
 def expire_download_state():
-    for unique_id in download_state.expire_stale():
+    timed_out, promoted = download_state.expire_stale()
+    for unique_id in timed_out:
         app.logger.error("Download %s timed out and released its concurrency slot", unique_id)
         socketio.emit('download_failed', {
             'unique_id': unique_id,
             'message': 'Download timed out.',
             'zip_url': None,
         }, namespace='/')
+    start_promoted_jobs(promoted)
 
 
 os.makedirs(MUSIC_DIR, exist_ok=True)
