@@ -1,11 +1,14 @@
 .root {
   margin: 2rem auto;
   padding: 2rem;
-  max-width: 600px;
+  max-width: 1000px;
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
   background: var(--secondary);
   border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  text-align: left;
 }
 
 .root h1 {
@@ -13,6 +16,73 @@
   color: var(--text);
 }
 
-.root p {
+.root p,
+.root li {
   color: var(--text);
-} 
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--background);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.loginForm,
+.limitForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 360px;
+}
+
+.requestLog {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  word-break: break-word;
+}
+
+.backLink {
+  color: var(--accent);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.message {
+  color: var(--accent);
+}
+
+.dangerButton {
+  background: var(--danger);
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .root {
+    margin: 0;
+    padding: 1rem;
+    border-radius: 0;
+  }
+}

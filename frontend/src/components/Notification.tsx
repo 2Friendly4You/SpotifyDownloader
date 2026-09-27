@@ -1,23 +1,55 @@
-import { useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import styles from "./Notification.module.css";
 
-const NOTIFICATION_DURATION = 3000;
+export type ToastType = "success" | "error" | "info";
 
-function Message({ message, type }: { message: string, type: "success" | "error" | "info" }) {
-  const [notification, setNotification] = useState<string>("");
+type Toast = {
+  id: number;
+  type: ToastType;
+  title: string;
+  message: string;
+};
 
-  useEffect(() => {
-    setNotification(message);
-    setTimeout(() => {
-      setNotification("");
-    }, NOTIFICATION_DURATION);
+type NotificationContextValue = {
+  notify: (type: ToastType, title: string, message: string) => void;
+};
+
+const NotificationContext = createContext<NotificationContextValue | null>(null);
+
+const TOAST_DURATION = 4000;
+
+export function NotificationProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const notify = useCallback((type: ToastType, title: string, message: string) => {
+    const id = Date.now() + Math.random();
+    setToasts((current) => [...current, { id, type, title, message }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, TOAST_DURATION);
   }, []);
 
+  const value = useMemo(() => ({ notify }), [notify]);
+
   return (
-    <div className={`${styles.notification} ${styles[type]}`}>
-      <h1>{notification}</h1>
-    </div>
+    <NotificationContext.Provider value={value}>
+      {children}
+      <div className={styles.container} aria-live="polite">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`${styles.toast} ${styles[toast.type]}`}>
+            <strong>{toast.title}</strong>
+            <p>{toast.message}</p>
+          </div>
+        ))}
+      </div>
+    </NotificationContext.Provider>
   );
 }
 
-export { Message };
+export function useNotification() {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    throw new Error("useNotification must be used within NotificationProvider");
+  }
+  return context;
+}

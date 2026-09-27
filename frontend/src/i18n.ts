@@ -38,7 +38,10 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
-    debug: true,
+    supportedLngs: ['en', 'de'],
+    nonExplicitSupportedLngs: true,
+    load: 'languageOnly',
+    debug: false,
     detection: detectionOptions,
     interpolation: {
       escapeValue: false,

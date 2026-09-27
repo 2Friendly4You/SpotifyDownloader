@@ -2,23 +2,27 @@
 :root[data-theme="light"] {
     --text: #020302;
     --background: #fcfdfc;
-    --primary: #47ff47;
-    --secondary: #d0e2d0;
-    --accent: #588d58;
+    --primary: #1f9d1f;
+    --secondary: #e7f3e7;
+    --accent: #3d6b3d;
+    --on-primary: #041a04;
     --input-bg: #ffffff;
-    --border-color: #e0e0e0;
+    --border-color: #d5e0d5;
     --danger: #dc3545;
+    color-scheme: light;
 }
 
 :root[data-theme="dark"] {
     --text: #fcfdfc;
     --background: #020302;
-    --primary: #00b800;
+    --primary: #1f9d1f;
     --secondary: #1d2f1d;
-    --accent: #72a772;
-    --input-bg: #1a1a1a;
+    --accent: #8fbf8f;
+    --on-primary: #041a04;
+    --input-bg: #141814;
     --border-color: #333333;
     --danger: #dc3545;
+    color-scheme: dark;
 }
 
 * {
@@ -27,25 +31,44 @@
     padding: 0;
 }
 
+html {
+    overflow-x: clip;
+}
+
 body {
-    word-wrap: break-word;
+    overflow-wrap: anywhere;
     font-family: 'Roboto', sans-serif;
     color: var(--text);
     background-color: var(--background);
     font-size: 16px;
     line-height: 1.6;
-    padding: 20px;
-    margin: 0 20%;
+    margin: 0;
+    padding: 24px 16px 32px;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
+#root {
+    width: 100%;
+    min-width: 0;
+}
+
 .container {
     width: 100%;
     max-width: 800px;
-    padding: 0 15px;
+    min-width: 0;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.page-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
 }
 
 h1, h2, h3 {
@@ -58,7 +81,7 @@ h1, h2, h3 {
 
 .form-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -71,12 +94,18 @@ label {
 
 input, select {
     width: 100%;
+    max-width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--input-bg);
     color: var(--text);
     font-size: 1rem;
+}
+
+select option {
+    background: var(--input-bg);
+    color: var(--text);
 }
 
 input:disabled, select:disabled {
@@ -90,13 +119,14 @@ input:disabled, select:disabled {
 
 button {
     background: var(--primary);
-    color: var(--text);
+    color: var(--on-primary);
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     font-size: 1rem;
     cursor: pointer;
     transition: opacity 0.2s, transform 0.2s;
+    max-width: 100%;
 }
 
 .full-width {
@@ -120,17 +150,20 @@ button:hover {
 
 @media (max-width: 768px) {
     body {
-        padding: 10px;
-        font-size: 14px;
-        margin: 0;
+        padding: 16px 12px 24px;
+        font-size: 15px;
     }
 
-    .container {
-        padding: 0 10px;
+    h1 {
+        font-size: 1.6rem;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
     }
 
     button {
-        padding: 0.6rem 1.2rem;
+        padding: 0.7rem 1.2rem;
     }
 
     .btn-success {

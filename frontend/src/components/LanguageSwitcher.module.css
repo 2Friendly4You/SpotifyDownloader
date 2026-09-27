@@ -1,26 +1,30 @@
 .root {
-    position: fixed;
-    bottom: 10px;
-    left: 10px;
-    z-index: 1000;
-    background-color: var(--background);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 10px;
-    display: flex;
-    align-items: center;
-    color: var(--text);
-    cursor: pointer;
-    transition: all 0.3s ease;
     width: auto;
+    max-width: 100%;
+    margin: 0;
+    background-color: var(--secondary);
+    color: var(--text);
+    border: 2px solid var(--accent);
+    border-radius: 999px;
+    padding: 8px 34px 8px 14px;
+    font-size: 0.95rem;
+    line-height: 1.2;
+    cursor: pointer;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text) 50%),
+        linear-gradient(135deg, var(--text) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
 }
 
-.root:hover {
-    background-color: var(--accent);
-    color: var(--background);
-    border: 1px solid var(--accent);
-} 
+.root:hover,
+.root:focus-visible {
+    border-color: var(--primary);
+    outline: none;
+}
 
-.root select {
-    width: auto;
+.root option {
+    background: var(--input-bg);
+    color: var(--text);
 }

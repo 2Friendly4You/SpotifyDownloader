@@ -1,5 +1,6 @@
 .root {
   margin: 2rem 0;
+  min-width: 0;
 }
 
 .root h1 {
@@ -14,10 +15,8 @@
   margin: 0;
 }
 
-.root button:hover {
-  filter: brightness(0.9);
-  transform: translateY(-2px);
-  transition: transform 0.3s ease;
+.clearButton:hover {
+  filter: brightness(0.92);
 }
 
 .clearButton {

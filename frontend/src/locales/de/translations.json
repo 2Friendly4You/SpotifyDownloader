@@ -1,9 +1,19 @@
 {
     "App": {
-        "appName":"Spotify Downloader"
+        "appName": "Spotify Downloader"
     },
     "SearchFields": {
-        "search": "Suche"
+        "search": "Suche",
+        "queryLabel": "Song oder URL suchen",
+        "audioLabel": "Audioanbieter",
+        "lyricsLabel": "Lyrics-Anbieter",
+        "outputLabel": "Ausgabeformat",
+        "missingTitle": "Hoppla...",
+        "missingMessage": "Bitte gib eine Suchanfrage ein und wähle ein Ausgabeformat!",
+        "playlistTitle": "Hinweis...",
+        "playlistMessage": "Das Herunterladen einer Playlist kann einige Minuten dauern.",
+        "impreciseTitle": "Hinweis...",
+        "impreciseMessage": "Suchanfragen sind oft ungenau. Bitte verwende Links, wenn du genaue Ergebnisse möchtest."
     },
     "Requests": {
         "requests": "Anfragen",
@@ -11,7 +21,27 @@
     },
     "RequestComponent": {
         "download": "Download",
-        "delete": "x"
+        "delete": "×",
+        "remove": "Anfrage entfernen",
+        "retry": "Erneut versuchen",
+        "errorLog": "Fehlerprotokoll",
+        "status": {
+            "pending": "Ausstehend",
+            "completed": "Abgeschlossen",
+            "failed": "Fehlgeschlagen",
+            "error": "Fehler"
+        },
+        "progress": {
+            "Searching": "Suche",
+            "Downloading": "Herunterladen",
+            "Converting": "Konvertieren",
+            "Embedding metadata": "Metadaten einbetten",
+            "Packaging": "Packen",
+            "Processing": "Verarbeitung",
+            "Done": "Fertig",
+            "Skipped": "Übersprungen",
+            "Error": "Fehler"
+        }
     },
     "Alert": {
         "ok": "OK",
@@ -76,7 +106,42 @@
     },
     "AdminPage": {
         "adminPage": "Admin Seite",
-        "adminPageDescription": "Dies ist die Admin-Seite. Fügen Sie Admin-Funktionen hier hinzu."
+        "adminPageDescription": "Dies ist die Admin-Seite. Fügen Sie Admin-Funktionen hier hinzu.",
+        "loading": "Wird geladen...",
+        "password": "Passwort",
+        "login": "Anmelden",
+        "logout": "Abmelden",
+        "backHome": "Zurück zur Startseite",
+        "invalidPassword": "Ungültiges Passwort",
+        "lastRequests": "Letzte 50 Suchanfragen",
+        "noRequests": "Noch keine Suchanfragen protokolliert.",
+        "setLimit": "Limit für gleichzeitige Anfragen setzen",
+        "concurrentLimit": "Erlaubte gleichzeitige Anfragen",
+        "setLimitButton": "Limit setzen",
+        "limitUpdated": "Limit für gleichzeitige Anfragen aktualisiert.",
+        "invalidLimit": "Ungültiger Limitwert.",
+        "storageManagement": "Speicherverwaltung",
+        "deleteZips": "Alle ZIP-Dateien löschen",
+        "deleteZipsTitle": "ZIP-Dateien löschen",
+        "deleteZipsConfirm": "Möchten Sie wirklich alle ZIP-Dateien im Musikverzeichnis löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+        "deleteZipsSuccess": "ZIP-Dateien gelöscht.",
+        "deleteZipsError": "ZIP-Dateien konnten nicht gelöscht werden.",
+        "runningTasks": "Laufende Downloads",
+        "requestId": "Anfrage-ID",
+        "noRunning": "Derzeit laufen keine Downloads.",
+        "otherInfo": "Weitere Informationen",
+        "storageInfo": "Speicherinformationen",
+        "storageError": "Fehler beim Abrufen der Speicherinformationen",
+        "musicDirPath": "Pfad des Musikverzeichnisses",
+        "usedSpace": "Belegter Speicher im Musikverzeichnis",
+        "zipCount": "ZIP-Dateien im Musikverzeichnis",
+        "partitionTotal": "Gesamtspeicher der Partition",
+        "partitionFree": "Freier Speicher der Partition",
+        "appConfig": "Anwendungskonfiguration",
+        "effectiveLimit": "Aktives Limit für gleichzeitige Downloads",
+        "cleanupConfig": "Konfiguration des Cleanup-Dienstes (aus der Umgebung)",
+        "days": "Tage",
+        "seconds": "Sekunden"
     },
     "Footer": {
         "reportBug": "Fehler melden",

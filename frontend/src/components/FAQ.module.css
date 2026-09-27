@@ -60,8 +60,10 @@
 
 .faq-question span:first-child {
   flex: 1;
+  min-width: 0;
   text-align: left;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .faq-icon {
@@ -97,4 +99,20 @@
   font-size: 1.08rem;
   line-height: 1.8;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .root h1 {
+    font-size: 1.6rem;
+  }
+
+  .faq-question {
+    font-size: 1rem;
+    padding: 1rem 0.8rem;
+  }
+
+  .faq-answer.open {
+    max-height: 640px;
+  }
 }

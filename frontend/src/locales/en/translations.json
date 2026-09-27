@@ -3,7 +3,17 @@
         "appName": "Spotify Downloader"
     },
     "SearchFields": {
-        "search": "Search"
+        "search": "Search",
+        "queryLabel": "Search for a song or URL",
+        "audioLabel": "Audio provider",
+        "lyricsLabel": "Lyrics provider",
+        "outputLabel": "Output format",
+        "missingTitle": "Oops...",
+        "missingMessage": "Please provide a search query and select an output format!",
+        "playlistTitle": "Info...",
+        "playlistMessage": "Downloading a playlist can take a few minutes.",
+        "impreciseTitle": "Info...",
+        "impreciseMessage": "Search queries are often very imprecise. Please use links if you want to get accurate results."
     },
     "Requests": {
         "requests": "Requests",
@@ -11,7 +21,27 @@
     },
     "RequestComponent": {
         "download": "Download",
-        "delete": "x"
+        "delete": "×",
+        "remove": "Remove request",
+        "retry": "Retry",
+        "errorLog": "Error Log",
+        "status": {
+            "pending": "Pending",
+            "completed": "Completed",
+            "failed": "Failed",
+            "error": "Error"
+        },
+        "progress": {
+            "Searching": "Searching",
+            "Downloading": "Downloading",
+            "Converting": "Converting",
+            "Embedding metadata": "Embedding metadata",
+            "Packaging": "Packaging",
+            "Processing": "Processing",
+            "Done": "Done",
+            "Skipped": "Skipped",
+            "Error": "Error"
+        }
     },
     "Alert": {
         "ok": "OK",
@@ -76,7 +106,42 @@
     },
     "AdminPage": {
         "adminPage": "Admin Page",
-        "adminPageDescription": "This is the admin page. Add admin features here."
+        "adminPageDescription": "This is the admin page. Add admin features here.",
+        "loading": "Loading...",
+        "password": "Password",
+        "login": "Login",
+        "logout": "Logout",
+        "backHome": "Back to home",
+        "invalidPassword": "Invalid password",
+        "lastRequests": "Last 50 Search Requests",
+        "noRequests": "No search requests logged yet.",
+        "setLimit": "Set Concurrent Request Limit",
+        "concurrentLimit": "Allowed Concurrent Requests",
+        "setLimitButton": "Set Limit",
+        "limitUpdated": "Concurrent request limit updated.",
+        "invalidLimit": "Invalid limit value provided.",
+        "storageManagement": "Storage Management",
+        "deleteZips": "Delete All ZIP Files",
+        "deleteZipsTitle": "Delete ZIP files",
+        "deleteZipsConfirm": "Are you sure you want to delete all ZIP files in the music directory? This action cannot be undone.",
+        "deleteZipsSuccess": "ZIP files deleted.",
+        "deleteZipsError": "Failed to delete ZIP files.",
+        "runningTasks": "Running Download Tasks",
+        "requestId": "Request ID",
+        "noRunning": "No download tasks currently running.",
+        "otherInfo": "Other Useful Information",
+        "storageInfo": "Storage Information",
+        "storageError": "Error getting storage info",
+        "musicDirPath": "Music Directory Path",
+        "usedSpace": "Music Directory Used Space",
+        "zipCount": "ZIP Files in Music Directory",
+        "partitionTotal": "Partition Total Space",
+        "partitionFree": "Partition Free Space",
+        "appConfig": "Application Configuration",
+        "effectiveLimit": "Effective Concurrent Download Limit",
+        "cleanupConfig": "Cleanup Service Configuration (from Environment)",
+        "days": "days",
+        "seconds": "seconds"
     },
     "Footer": {
         "reportBug": "Report Bug",

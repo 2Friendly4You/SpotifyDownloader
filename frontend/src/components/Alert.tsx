@@ -6,7 +6,7 @@ type AlertState = {
   isOpen: boolean;
   title: string;
   message: string;
-  requestId: number | null;
+  requestId: string | null;
 };
 
 type AlertProps = {
@@ -108,7 +108,7 @@ export const useAlert = () => {
     requestId: null,
   });
 
-  const showAlert = useCallback((title: string, message: string, requestId: number | null = null) => {
+  const showAlert = useCallback((title: string, message: string, requestId: string | null = null) => {
     setAlertState({
       isOpen: true,
       title,

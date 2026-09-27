@@ -1,0 +1,16 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+searches.json
+pending_requests.txt
+*.log
+.git
+.gitignore
+Dockerfile
+.dockerignore
+.DS_Store
+Thumbs.db

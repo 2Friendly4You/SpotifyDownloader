@@ -3,10 +3,11 @@ import styles from "./LanguageSwitcher.module.css";
 
 function LanguageSwitcher() {
   const { i18n } = useTranslation();
+  const language = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
 
   return (
     <select className={styles.root}
-      value={i18n.language}
+      value={language === "de" ? "de" : "en"}
       onChange={(e) => i18n.changeLanguage(e.target.value)}
     >
       <option value="en">🇬🇧 English</option>
