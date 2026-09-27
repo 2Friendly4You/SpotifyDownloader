@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Import application
+        env:
+          FLASK_SECRET_KEY: ci-flask-secret-not-for-production
+          ADMIN_PASSWORD: ci-admin-password
+          MUSIC_DIR: ${{ github.workspace }}/music
+          SEARCHES_FILE: ${{ github.workspace }}/data/searches.json
+        run: python -c "import app"
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck and build
+        run: pnpm build
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Write compose env
+        run: printf 'FLASK_SECRET_KEY=ci-flask-secret-not-for-production\nADMIN_PASSWORD=ci-admin-password\n' > .env
+      - name: Start stack
+        run: docker compose up --build -d --wait
+      - name: Health and auth smoke
+        run: |
+          set -euo pipefail
+          # compose --wait can return before nginx is accepting on :8900
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8900/api/download_counter | grep -q '"total"'; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Download counter did not become ready in time"
+            docker compose logs
+            exit 1
+          fi
+          code=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8900/)
+          test "$code" = "200"
+          curl -sf -c cookies.txt -H "Content-Type: application/json" \
+            -d '{"password":"ci-admin-password"}' \
+            http://localhost:8900/api/admin/login
+          curl -sf -b cookies.txt http://localhost:8900/api/admin/session | grep -Eq '"logged_in"[[:space:]]*:[[:space:]]*true'
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
