@@ -21,14 +21,12 @@ jobs:
         with:
           python-version: "3.14"
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Import application
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Test
         env:
           FLASK_SECRET_KEY: ci-flask-secret-not-for-production
           ADMIN_PASSWORD: ci-admin-password
-          MUSIC_DIR: ${{ github.workspace }}/music
-          SEARCHES_FILE: ${{ github.workspace }}/data/searches.json
-        run: python -c "import app"
+        run: pytest
 
   frontend:
     runs-on: ubuntu-latest
