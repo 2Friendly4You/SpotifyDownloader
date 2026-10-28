@@ -1,4 +1,4 @@
-FROM python:3.14-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 # curl and unzip are only needed to install Deno. ffmpeg stays for spotdl and yt-dlp.
 RUN apt-get update \
