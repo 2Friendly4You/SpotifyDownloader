@@ -4,5 +4,5 @@ gunicorn>=26.2.0
 python-engineio>=4.14.0
 python-socketio>=5.17.0
 simple-websocket>=1.1.0
-spotdl>=4.5.2
-yt-dlp>=2026.8.19
+spotdl>=4.6.0
+yt-dlp>=2026.10.21
