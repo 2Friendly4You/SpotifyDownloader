@@ -52,7 +52,7 @@ importers:
         specifier: ^0.5.7
         version: 0.5.7(eslint@10.11.0)
       globals:
-        specifier: ^17.12.0
+        specifier: ^17.13.0
         version: 17.13.0
       typescript:
         specifier: ^6.0.3
