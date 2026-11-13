@@ -26,6 +26,12 @@
         "retry": "Retry",
         "errorLog": "Error Log",
         "queuePosition": "Position {{position}}",
+        "searchCount": "{{done}}/{{total}} songs",
+        "eta": {
+            "underMinute": "< 1 min left",
+            "minutes": "About {{value}} min left",
+            "hours": "About {{value}} h left"
+        },
         "status": {
             "queued": "Queued",
             "pending": "Pending",

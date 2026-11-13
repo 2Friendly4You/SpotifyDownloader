@@ -26,6 +26,12 @@
         "retry": "Erneut versuchen",
         "errorLog": "Fehlerprotokoll",
         "queuePosition": "Position {{position}}",
+        "searchCount": "{{done}}/{{total}} Songs",
+        "eta": {
+            "underMinute": "Noch < 1 Min.",
+            "minutes": "Noch ca. {{value}} Min.",
+            "hours": "Noch ca. {{value}} Std."
+        },
         "status": {
             "queued": "In der Warteschlange",
             "pending": "Ausstehend",

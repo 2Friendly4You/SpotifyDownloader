@@ -123,7 +123,7 @@ To change the exposed port (default: 8900), modify the ports section in `docker-
    - Lyrics provider (only for Spotify/search)
    - Output format
 4. Click "Search" to start the download
-5. Monitor the download progress in the "Requests" section
+5. Monitor the download progress in the "Requests" section. While spotDL looks up a playlist or album, the card shows how many songs it has resolved, and a rough time remaining appears once it can be estimated
 6. Click "Download" when the file is ready
 
 Admin panel: `http://localhost:8900/admin`

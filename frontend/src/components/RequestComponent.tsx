@@ -2,6 +2,7 @@ import { Trans, useTranslation } from "react-i18next";
 import styles from "./RequestComponent.module.css";
 import type { DownloadRequest } from "./Types";
 import { useDownloads } from "../DownloadsContext";
+import { roughEta } from "../eta";
 
 function RequestComponent({
   request,
@@ -11,12 +12,23 @@ function RequestComponent({
   handleClose: () => void;
 }) {
   const { startFileDownload, retryRequest } = useDownloads();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const progress = Math.max(0, Math.min(100, Math.round(request.progress ?? 0)));
   const progressLabel = request.progressMessage
     ? t(`RequestComponent.progress.${request.progressMessage}`, {
         defaultValue: request.progressMessage,
       })
+    : "";
+
+  const searching = request.progressMessage === "Searching";
+  const songCount =
+    searching && request.songsTotal
+      ? t("RequestComponent.searchCount", { done: request.songsDone ?? 0, total: request.songsTotal })
+      : "";
+  const stageLabel = songCount ? `${progressLabel} ${songCount}` : progressLabel;
+  const eta = roughEta(request.etaSeconds);
+  const etaLabel = eta
+    ? t(`RequestComponent.eta.${eta.key}`, { value: eta.value.toLocaleString(i18n.language) })
     : "";
 
   const showActions = request.status === "completed" || request.status === "failed";
@@ -43,18 +55,19 @@ function RequestComponent({
         <div className={styles.progressBlock}>
           <div className={styles.progressMeta}>
             <span className={styles.progressPercent}>{progress}%</span>
-            {progressLabel && <span className={styles.progressStage}>{progressLabel}</span>}
+            {stageLabel && <span className={styles.progressStage}>{stageLabel}</span>}
           </div>
           <div
-            className={styles.progressTrack}
+            className={`${styles.progressTrack} ${searching ? styles.progressSearching : ""}`}
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={progress}
-            aria-valuetext={`${progress}% ${progressLabel}`}
+            aria-valuetext={[`${progress}%`, stageLabel, etaLabel].filter(Boolean).join(", ")}
           >
             <div className={styles.progressFill} style={{ width: `${progress}%` }} />
           </div>
+          {etaLabel && <span className={styles.progressEta}>{etaLabel}</span>}
         </div>
       )}
       {request.message && <p className={styles.message}>{request.message}</p>}

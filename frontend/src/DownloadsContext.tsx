@@ -12,6 +12,9 @@ type StatusResponse = {
   message?: string;
   progress?: number;
   progress_message?: string;
+  songs_done?: number;
+  songs_total?: number;
+  eta_seconds?: number;
   position?: number;
 };
 
@@ -21,6 +24,15 @@ type SearchResponse = {
   unique_id?: string;
   queued?: boolean;
   position?: number | null;
+};
+
+type ProgressEvent = {
+  unique_id: string;
+  progress?: number;
+  message?: string;
+  songs_done?: number;
+  songs_total?: number;
+  eta_seconds?: number;
 };
 
 type QueueUpdateEntry = {
@@ -142,6 +154,9 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
           message: result.data.message || item.message,
           progress: result.data.progress ?? item.progress,
           progressMessage: result.data.progress_message ?? item.progressMessage,
+          songsDone: result.data.songs_done,
+          songsTotal: result.data.songs_total,
+          etaSeconds: result.data.eta_seconds,
           queuePosition: nextStatus === "queued" ? result.data.position ?? item.queuePosition : undefined,
         });
       } catch {
@@ -168,7 +183,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       refreshStored();
     });
 
-    socket.on("download_progress", (data: { unique_id: string; progress?: number; message?: string }) => {
+    socket.on("download_progress", (data: ProgressEvent) => {
       updateRequests((current) =>
         current.map((item) =>
           item.unique_id === data.unique_id && (item.status === "pending" || item.status === "queued")
@@ -178,6 +193,11 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
                 queuePosition: undefined,
                 progress: data.progress ?? item.progress,
                 progressMessage: data.message || item.progressMessage,
+                // The server sends these with every update that has them, so a
+                // missing field means the value no longer applies.
+                songsDone: data.songs_done,
+                songsTotal: data.songs_total,
+                etaSeconds: data.eta_seconds,
               }
             : item
         )
