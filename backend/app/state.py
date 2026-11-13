@@ -6,6 +6,18 @@ from app.config import PENDING_TTL_SECONDS, load_queue_limit, retention_seconds
 from app.searches import load_initial_concurrent_limit
 
 
+PROGRESS_DETAIL_KEYS = ('songs_done', 'songs_total', 'eta_seconds')
+
+
+def _eta_moved(previous, current):
+    """True when an ETA changed enough to tell the client again."""
+    if (previous is None) != (current is None):
+        return True
+    if previous is None:
+        return False
+    return abs(current - previous) >= max(10, previous * 0.1)
+
+
 class DownloadState:
     def __init__(self, concurrent_limit, queue_limit):
         self._lock = threading.Lock()
@@ -64,27 +76,41 @@ class DownloadState:
             promoted.append(job)
         return promoted
 
-    def update_progress(self, unique_id, percent, message, min_interval=0.4):
+    def update_progress(self, unique_id, percent, message, min_interval=0.4, details=None):
+        """Store progress and decide whether it is worth a socket.io event.
+
+        ``details`` holds optional extras (``songs_done``, ``songs_total``,
+        ``eta_seconds``). They replace the previous extras, so a call without
+        them clears an estimate that no longer applies.
+        """
         now = time.monotonic()
         with self._lock:
             current = self._progress.get(unique_id, {'percent': 0.0, 'message': ''})
             if percent is None:
                 percent = current['percent']
             percent = max(0.0, min(100.0, float(percent)))
-            self._progress[unique_id] = {'percent': percent, 'message': message}
-            last_time, last_percent, last_message = self._progress_emit.get(
-                unique_id, (0.0, -1.0, None)
+            stored = {'percent': percent, 'message': message}
+            for key in PROGRESS_DETAIL_KEYS:
+                value = (details or {}).get(key)
+                if value is not None:
+                    stored[key] = value
+            self._progress[unique_id] = stored
+            last_time, last_percent, last_message, last_counts, last_eta = self._progress_emit.get(
+                unique_id, (0.0, -1.0, None, (None, None), None)
             )
+            counts = (stored.get('songs_done'), stored.get('songs_total'))
+            eta = stored.get('eta_seconds')
             message_changed = message != last_message
             percent_moved = abs(percent - last_percent) >= 1
+            details_moved = counts != last_counts or _eta_moved(last_eta, eta)
             elapsed = now - last_time
             should_emit = (
                 message_changed
                 or percent >= 100
-                or (percent_moved and elapsed >= min_interval)
+                or ((percent_moved or details_moved) and elapsed >= min_interval)
             )
             if should_emit:
-                self._progress_emit[unique_id] = (now, percent, message)
+                self._progress_emit[unique_id] = (now, percent, message, counts, eta)
             return percent, message, should_emit
 
     def get_progress(self, unique_id):

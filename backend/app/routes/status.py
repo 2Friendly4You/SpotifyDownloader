@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, send_from_directory
 
 from app.config import MUSIC_DIR
 from app.searches import get_download_total
-from app.state import download_state
+from app.state import PROGRESS_DETAIL_KEYS, download_state
 
 status_bp = Blueprint('status', __name__)
 
@@ -32,11 +32,15 @@ def check_request(unique_id):
 
     if kind == 'pending':
         progress = download_state.get_progress(unique_id)
-        return jsonify({
+        body = {
             'status': 'pending',
             'progress': round(progress['percent'], 1),
             'progress_message': progress['message'],
-        }), 202
+        }
+        for key in PROGRESS_DETAIL_KEYS:
+            if key in progress:
+                body[key] = progress[key]
+        return jsonify(body), 202
 
     if kind == 'failed':
         error_message = extra or "Download failed"
