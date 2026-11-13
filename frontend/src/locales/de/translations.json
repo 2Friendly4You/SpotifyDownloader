@@ -22,9 +22,9 @@
     "RequestComponent": {
         "download": "Download",
         "delete": "×",
-        "remove": "Anfrage entfernen",
+        "remove": "Entfernen",
+        "cancelAndDelete": "Download abbrechen und löschen",
         "retry": "Erneut versuchen",
-        "cancel": "Abbrechen",
         "errorLog": "Fehlerprotokoll",
         "queuePosition": "Position {{position}}",
         "searchCount": "{{done}}/{{total}} Songs",
@@ -69,6 +69,8 @@
         "ok": "OK",
         "cancel": "Abbrechen",
         "deleteRequest": "Anfrage löschen",
+        "cancelRequest": "Download abbrechen",
+        "cancelRequestMessage": "Sind Sie sicher, dass Sie den Download von \"{{title}}\" abbrechen möchten? Bereits geladene Dateien werden gelöscht.",
         "deleteRequests": "Anfragen löschen",
         "deleteRequestMessage": "Sind Sie sicher, dass Sie \"{{title}}\" löschen möchten?",
         "deleteRequestsMessage": "Sind Sie sicher, dass Sie alle Anfragen löschen möchten?"

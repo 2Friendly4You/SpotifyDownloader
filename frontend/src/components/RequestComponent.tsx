@@ -44,16 +44,28 @@ function RequestComponent({
   const failedTracks =
     request.status === "completed" || request.status === "failed" ? request.failedTracks ?? [] : [];
 
+  // One control per card: while the job is queued or running the trash can
+  // cancels it on the server and deletes its files, afterwards it only removes the card.
   const cancellable = request.status === "pending" || request.status === "queued";
-  const showActions = request.status === "completed" || request.status === "failed" || cancellable;
+  const closeLabel = t(cancellable ? "RequestComponent.cancelAndDelete" : "RequestComponent.remove");
+  const showActions = request.status === "completed" || request.status === "failed";
 
   return (
     <div className={`${styles.root} ${styles[request.status] || ""}`}>
       <div className={styles.header}>
         <h2 title={request.searchQuery}>{request.searchQuery}</h2>
-        <button type="button" className={styles.closeButton} onClick={handleClose} aria-label={t("RequestComponent.remove")}>
-          <svg viewBox="0 0 12 12" aria-hidden="true">
-            <path d="M2.5 2.5 L9.5 9.5 M9.5 2.5 L2.5 9.5" />
+        <button
+          type="button"
+          className={styles.closeButton}
+          onClick={handleClose}
+          aria-label={closeLabel}
+          title={closeLabel}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18" />
+            <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+            <path d="M5.5 6l1 13.5A1.5 1.5 0 0 0 8 21h8a1.5 1.5 0 0 0 1.5-1.5L18.5 6" />
+            <path d="M10 10.5v6M14 10.5v6" />
           </svg>
         </button>
       </div>
@@ -124,11 +136,6 @@ function RequestComponent({
           {request.status === "failed" && (
             <button type="button" className={styles.retryButton} onClick={() => retryRequest(request.unique_id)}>
               <Trans i18nKey="RequestComponent.retry">Retry</Trans>
-            </button>
-          )}
-          {cancellable && (
-            <button type="button" className={styles.cancelButton} onClick={handleClose}>
-              <Trans i18nKey="RequestComponent.cancel">Cancel</Trans>
             </button>
           )}
         </div>
