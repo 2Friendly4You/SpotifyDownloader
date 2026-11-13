@@ -15,9 +15,10 @@ function Requests() {
 
   const handleCloseRequest = (uniqueId: string) => {
     const request = requests.find((item) => item.unique_id === uniqueId);
+    const active = request?.status === "pending" || request?.status === "queued";
     showAlert(
-      t("Alert.deleteRequest"),
-      t("Alert.deleteRequestMessage", { title: request?.searchQuery }),
+      t(active ? "Alert.cancelRequest" : "Alert.deleteRequest"),
+      t(active ? "Alert.cancelRequestMessage" : "Alert.deleteRequestMessage", { title: request?.searchQuery }),
       uniqueId
     );
   };

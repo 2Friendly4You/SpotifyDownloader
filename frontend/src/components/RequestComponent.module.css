@@ -55,11 +55,12 @@
 
 .closeButton svg {
   display: block;
-  width: 0.72rem;
-  height: 0.72rem;
+  width: 0.95rem;
+  height: 0.95rem;
   fill: none;
   stroke: white;
-  stroke-width: 1.6;
+  stroke-width: 2;
+  stroke-linejoin: round;
   stroke-linecap: round;
 }
 
@@ -92,15 +93,8 @@
 }
 
 .downloadButton,
-.retryButton,
-.cancelButton {
+.retryButton {
   margin: 0;
-}
-
-.cancelButton {
-  background-color: transparent;
-  color: inherit;
-  border: 1px solid var(--border-color);
 }
 
 .downloadButton {
