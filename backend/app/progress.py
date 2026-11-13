@@ -84,3 +84,41 @@ def round_eta(seconds):
 
 
 song_rate = SongRate()
+
+
+class SongProgress:
+    """Overall progress of songs that spotDL downloads in parallel.
+
+    spotDL reports each song separately and the songs interleave, so showing
+    the latest per-song step made the text jump around. This keeps one
+    number: finished songs plus the partial progress of the running ones,
+    and it never goes backwards.
+    """
+
+    FINISHED_MESSAGES = {'Done', 'Error', 'Skipped'}
+
+    def __init__(self, total):
+        self.total = max(int(total), 0)
+        self._partial = {}
+        self._finished = set()
+        self._fraction = 0.0
+
+    def update(self, key, percent, message):
+        if key not in self._finished:
+            if message in self.FINISHED_MESSAGES or (percent or 0) >= 100:
+                self._finished.add(key)
+                self._partial.pop(key, None)
+            else:
+                self._partial[key] = max(0.0, min(1.0, (percent or 0) / 100))
+        if self.total:
+            raw = (len(self._finished) + sum(self._partial.values())) / self.total
+            self._fraction = max(self._fraction, min(1.0, raw))
+        return self.done, self.running, self._fraction
+
+    @property
+    def done(self):
+        return min(len(self._finished), self.total)
+
+    @property
+    def running(self):
+        return len(self._partial)

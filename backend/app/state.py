@@ -6,7 +6,7 @@ from app.config import PENDING_TTL_SECONDS, load_queue_limit, retention_seconds
 from app.searches import load_initial_concurrent_limit
 
 
-PROGRESS_DETAIL_KEYS = ('songs_done', 'songs_total', 'eta_seconds')
+PROGRESS_DETAIL_KEYS = ('songs_done', 'songs_total', 'songs_running', 'eta_seconds')
 
 
 def _eta_moved(previous, current):
@@ -97,18 +97,22 @@ class DownloadState:
                     stored[key] = value
             self._progress[unique_id] = stored
             last_time, last_percent, last_message, last_counts, last_eta = self._progress_emit.get(
-                unique_id, (0.0, -1.0, None, (None, None), None)
+                unique_id, (0.0, -1.0, None, (None, None, None), None)
             )
-            counts = (stored.get('songs_done'), stored.get('songs_total'))
+            counts = (stored.get('songs_done'), stored.get('songs_total'), stored.get('songs_running'))
             eta = stored.get('eta_seconds')
             message_changed = message != last_message
             percent_moved = abs(percent - last_percent) >= 1
-            details_moved = counts != last_counts or _eta_moved(last_eta, eta)
+            # Song counts change at most a few times per song, so every change
+            # is sent. Throttling them dropped the last songs of a burst, and
+            # the counter then jumped from "75/80" straight to the next phase.
+            counts_changed = counts != last_counts
             elapsed = now - last_time
             should_emit = (
                 message_changed
+                or counts_changed
                 or percent >= 100
-                or ((percent_moved or details_moved) and elapsed >= min_interval)
+                or ((percent_moved or _eta_moved(last_eta, eta)) and elapsed >= min_interval)
             )
             if should_emit:
                 self._progress_emit[unique_id] = (now, percent, message, counts, eta)

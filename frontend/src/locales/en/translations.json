@@ -27,6 +27,8 @@
         "errorLog": "Error Log",
         "queuePosition": "Position {{position}}",
         "searchCount": "{{done}}/{{total}} songs",
+        "running_one": "{{count}} in progress",
+        "running_other": "{{count}} in progress",
         "eta": {
             "underMinute": "< 1 min left",
             "minutes": "About {{value}} min left",

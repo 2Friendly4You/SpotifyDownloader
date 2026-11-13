@@ -14,7 +14,7 @@ from spotdl.utils.spotify import SpotifyClient, SpotifyError
 
 from app.config import MUSIC_DIR
 from app.extensions import socketio
-from app.progress import EtaEstimator, round_eta, song_rate
+from app.progress import EtaEstimator, SongProgress, round_eta, song_rate
 from app.retries import (
     FAILED_TRACKS_FILE,
     MAX_FAILED_TRACKS,
@@ -73,6 +73,7 @@ class SpotdlProgress:
         self._download_started = None
         self._retry_total = 0
         self._retry_eta = None
+        self._songs = SongProgress(0)
 
     def searching(self):
         report_progress(self.unique_id, SEARCH_LIST_PERCENT, 'Searching', force=True)
@@ -96,19 +97,35 @@ class SpotdlProgress:
         self.total = total
         self._download_started = self._clock()
         self._download_eta = EtaEstimator(clock=self._clock)
+        self._songs = SongProgress(total)
         report_progress(self.unique_id, SEARCH_DONE_PERCENT, 'Downloading', force=True, details={
+            'songs_done': 0,
             'songs_total': total,
             'eta_seconds': round_eta(song_rate.estimate(total)),
         })
 
-    def download_update(self, fraction, message):
-        fraction = max(0.0, min(1.0, fraction))
+    def song_update(self, key, percent, message):
+        """One song changed. The card shows the aggregate, not the song's own step."""
+        done, running, fraction = self._songs.update(key, percent, message)
+        if self._retry_total:
+            left = self._retry_eta.update(fraction)
+            if left is None:
+                left = song_rate.estimate(self._retry_total) * (1.0 - fraction)
+            report_progress(self.unique_id, None, 'Retrying', details={
+                'songs_done': done,
+                'songs_total': self._retry_total,
+                'songs_running': running,
+                'eta_seconds': round_eta(left),
+            })
+            return
         left = self._download_eta.update(fraction)
         if left is None:
             left = song_rate.estimate(self.total) * (1.0 - fraction)
         percent = SEARCH_DONE_PERCENT + (DOWNLOAD_DONE_PERCENT - SEARCH_DONE_PERCENT) * fraction
-        report_progress(self.unique_id, percent, message or 'Downloading', details={
+        report_progress(self.unique_id, percent, 'Downloading', details={
+            'songs_done': done,
             'songs_total': self.total,
+            'songs_running': running,
             'eta_seconds': round_eta(left),
         })
 
@@ -120,21 +137,11 @@ class SpotdlProgress:
         """A retry round for ``count`` failed songs starts. The bar stays where it is."""
         self._retry_total = count
         self._retry_eta = EtaEstimator(clock=self._clock)
+        self._songs = SongProgress(count)
         report_progress(self.unique_id, None, 'Retrying', force=True, details={
             'songs_done': 0,
             'songs_total': count,
             'eta_seconds': round_eta(song_rate.estimate(count)),
-        })
-
-    def retry_update(self, done, fraction):
-        fraction = max(0.0, min(1.0, fraction))
-        left = self._retry_eta.update(fraction)
-        if left is None:
-            left = song_rate.estimate(self._retry_total) * (1.0 - fraction)
-        report_progress(self.unique_id, None, 'Retrying', details={
-            'songs_done': min(done, self._retry_total),
-            'songs_total': self._retry_total,
-            'eta_seconds': round_eta(left),
         })
 
 
@@ -155,20 +162,10 @@ def youtube_download_percent(data):
     return ((index - 1) + fraction) / count * 90
 
 
-def _tracker_fraction(tracker):
-    total = tracker.parent.overall_total or 0
-    if total:
-        return tracker.parent.overall_progress / total
-    return (tracker.progress or 0) / 100
-
-
-def attach_spotdl_progress(downloader, progress, retry=False):
+def attach_spotdl_progress(downloader, progress):
     """Give the downloader a fresh progress handler that feeds ``progress``."""
     def callback(tracker, message):
-        if retry:
-            progress.retry_update(tracker.parent.overall_completed_tasks, _tracker_fraction(tracker))
-        else:
-            progress.download_update(_tracker_fraction(tracker), message)
+        progress.song_update(id(tracker), tracker.progress, message)
 
     downloader.progress_handler = ProgressHandler(
         simple_tui=True,
@@ -239,7 +236,7 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
         if delay:
             sleep(delay)
         use_provider(downloader, provider)
-        attach_spotdl_progress(downloader, progress, retry=True)
+        attach_spotdl_progress(downloader, progress)
         progress.retrying(len(batch))
         errors_before = len(downloader.errors)
         results = downloader.download_multiple_songs(batch)

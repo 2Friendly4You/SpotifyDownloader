@@ -22,15 +22,24 @@ function RequestComponent({
 
   const searching = request.progressMessage === "Searching";
   const retrying = request.progressMessage === "Retrying";
-  const songCount =
-    (searching || retrying) && request.songsTotal
-      ? t("RequestComponent.searchCount", { done: request.songsDone ?? 0, total: request.songsTotal })
+  const downloading = request.progressMessage === "Downloading";
+  // spotDL works on several songs at once, so the card shows how many are
+  // finished instead of whichever song reported its own step last.
+  const showCount =
+    (searching || retrying || (downloading && (request.songsTotal ?? 0) > 1)) && Boolean(request.songsTotal);
+  const songCount = showCount
+    ? t("RequestComponent.searchCount", { done: request.songsDone ?? 0, total: request.songsTotal })
+    : "";
+  const runningLabel =
+    (downloading || retrying) && request.songsRunning && (request.songsTotal ?? 0) > 1
+      ? t("RequestComponent.running", { count: request.songsRunning })
       : "";
   const stageLabel = songCount ? `${progressLabel} ${songCount}` : progressLabel;
   const eta = roughEta(request.etaSeconds);
   const etaLabel = eta
     ? t(`RequestComponent.eta.${eta.key}`, { value: eta.value.toLocaleString(i18n.language) })
     : "";
+  const secondaryLabel = [runningLabel, etaLabel].filter(Boolean).join(" · ");
 
   const failedTracks =
     request.status === "completed" || request.status === "failed" ? request.failedTracks ?? [] : [];
@@ -67,11 +76,11 @@ function RequestComponent({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={progress}
-            aria-valuetext={[`${progress}%`, stageLabel, etaLabel].filter(Boolean).join(", ")}
+            aria-valuetext={[`${progress}%`, stageLabel, secondaryLabel].filter(Boolean).join(", ")}
           >
             <div className={styles.progressFill} style={{ width: `${progress}%` }} />
           </div>
-          {etaLabel && <span className={styles.progressEta}>{etaLabel}</span>}
+          {secondaryLabel && <span className={styles.progressEta}>{secondaryLabel}</span>}
         </div>
       )}
       {request.message && <p className={styles.message}>{request.message}</p>}

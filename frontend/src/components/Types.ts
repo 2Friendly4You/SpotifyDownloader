@@ -25,6 +25,7 @@ export type DownloadRequest = {
   progressMessage?: string;
   songsDone?: number;
   songsTotal?: number;
+  songsRunning?: number;
   etaSeconds?: number;
   failedTracks?: FailedTrack[];
   queuePosition?: number;
