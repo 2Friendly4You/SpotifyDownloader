@@ -152,8 +152,11 @@ def test_search_reports_each_resolved_song(monkeypatch):
         }
 
     calls = []
-    songs = downloads.search_songs(FakeDownloader(), "query", lambda done, total: calls.append((done, total)))
+    songs, failed = downloads.search_songs(
+        FakeDownloader(), "query", lambda done, total: calls.append((done, total))
+    )
     assert sorted(songs) == ["A", "B"]
+    assert failed == [{"title": "broken", "reason": "metadata_failed", "url": None}]
     assert calls == [(0, 3), (1, 3), (2, 3), (3, 3)]
 
 

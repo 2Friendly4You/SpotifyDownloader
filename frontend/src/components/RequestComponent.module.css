@@ -189,6 +189,48 @@
   font-variant-numeric: tabular-nums;
 }
 
+.failedTracks {
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.failedTracks summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.failedTracks ul {
+  list-style: none;
+  margin: 0.5rem 0 0.1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.failedTracks li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.failedTitle {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+.failedReason {
+  flex: none;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
 .queuePosition {
   font-size: 0.95rem;
   opacity: 0.85;

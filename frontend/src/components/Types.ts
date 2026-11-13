@@ -7,6 +7,14 @@ export type SearchPayload = {
   output_format: string;
 };
 
+export type FailedTrackReason = "not_found" | "download_failed" | "conversion_failed" | "metadata_failed";
+
+export type FailedTrack = {
+  title: string;
+  reason: FailedTrackReason | string;
+  url?: string | null;
+};
+
 export type DownloadRequest = {
   unique_id: string;
   searchQuery: string;
@@ -18,6 +26,7 @@ export type DownloadRequest = {
   songsDone?: number;
   songsTotal?: number;
   etaSeconds?: number;
+  failedTracks?: FailedTrack[];
   queuePosition?: number;
   timestamp: string;
   audio_format: string;

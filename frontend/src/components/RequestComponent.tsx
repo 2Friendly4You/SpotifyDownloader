@@ -21,8 +21,9 @@ function RequestComponent({
     : "";
 
   const searching = request.progressMessage === "Searching";
+  const retrying = request.progressMessage === "Retrying";
   const songCount =
-    searching && request.songsTotal
+    (searching || retrying) && request.songsTotal
       ? t("RequestComponent.searchCount", { done: request.songsDone ?? 0, total: request.songsTotal })
       : "";
   const stageLabel = songCount ? `${progressLabel} ${songCount}` : progressLabel;
@@ -30,6 +31,9 @@ function RequestComponent({
   const etaLabel = eta
     ? t(`RequestComponent.eta.${eta.key}`, { value: eta.value.toLocaleString(i18n.language) })
     : "";
+
+  const failedTracks =
+    request.status === "completed" || request.status === "failed" ? request.failedTracks ?? [] : [];
 
   const showActions = request.status === "completed" || request.status === "failed";
 
@@ -71,6 +75,29 @@ function RequestComponent({
         </div>
       )}
       {request.message && <p className={styles.message}>{request.message}</p>}
+      {failedTracks.length > 0 && (
+        <details className={styles.failedTracks}>
+          <summary>{t("RequestComponent.failedTracks.summary", { count: failedTracks.length })}</summary>
+          <ul>
+            {failedTracks.map((track, index) => (
+              <li key={`${track.url ?? track.title}-${index}`}>
+                {track.url ? (
+                  <a href={track.url} target="_blank" rel="noopener noreferrer" className={styles.failedTitle}>
+                    {track.title}
+                  </a>
+                ) : (
+                  <span className={styles.failedTitle}>{track.title}</span>
+                )}
+                <span className={styles.failedReason}>
+                  {t(`RequestComponent.failedTracks.reasons.${track.reason}`, {
+                    defaultValue: t("RequestComponent.failedTracks.reasons.download_failed"),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <p className={styles.timestamp}>{new Date(request.timestamp).toLocaleString()}</p>
       {showActions && (
         <div className={styles.buttonContainer}>

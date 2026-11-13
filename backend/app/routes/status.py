@@ -45,11 +45,19 @@ def check_request(unique_id):
     if kind == 'failed':
         error_message = extra or "Download failed"
         zip_url = f'/music/{unique_id}.zip' if os.path.isfile(file_path) else None
-        return jsonify({'status': 'failed', 'message': error_message, 'url': zip_url}), 200
+        body = {'status': 'failed', 'message': error_message, 'url': zip_url}
+        failed_tracks = download_state.failed_tracks(unique_id)
+        if failed_tracks:
+            body['failed_tracks'] = failed_tracks
+        return jsonify(body), 200
 
     if kind == 'completed' or os.path.isfile(file_path):
         if os.path.isfile(file_path):
-            return jsonify({'status': 'completed', 'url': f'/music/{unique_id}.zip'}), 200
+            body = {'status': 'completed', 'url': f'/music/{unique_id}.zip'}
+            failed_tracks = download_state.failed_tracks(unique_id)
+            if failed_tracks:
+                body['failed_tracks'] = failed_tracks
+            return jsonify(body), 200
         return jsonify({'status': 'error', 'message': 'File was marked completed but is now missing.'}), 404
 
     return jsonify({'status': 'not_found', 'message': 'Request not found or expired.'}), 404

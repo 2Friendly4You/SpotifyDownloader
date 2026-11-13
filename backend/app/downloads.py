@@ -15,6 +15,17 @@ from spotdl.utils.spotify import SpotifyClient, SpotifyError
 from app.config import MUSIC_DIR
 from app.extensions import socketio
 from app.progress import EtaEstimator, round_eta, song_rate
+from app.retries import (
+    FAILED_TRACKS_FILE,
+    MAX_FAILED_TRACKS,
+    failed_tracks_text,
+    failure_entry,
+    fallback_song_limit,
+    reasons_by_url,
+    retry_delay,
+    retry_plan,
+    use_provider,
+)
 from app.state import PROGRESS_DETAIL_KEYS, download_state
 
 _spotify_init_lock = threading.Lock()
@@ -60,6 +71,8 @@ class SpotdlProgress:
         self._search_eta = None
         self._download_eta = None
         self._download_started = None
+        self._retry_total = 0
+        self._retry_eta = None
 
     def searching(self):
         report_progress(self.unique_id, SEARCH_LIST_PERCENT, 'Searching', force=True)
@@ -103,6 +116,27 @@ class SpotdlProgress:
         if self._download_started is not None:
             song_rate.record(self._clock() - self._download_started, self.total)
 
+    def retrying(self, count):
+        """A retry round for ``count`` failed songs starts. The bar stays where it is."""
+        self._retry_total = count
+        self._retry_eta = EtaEstimator(clock=self._clock)
+        report_progress(self.unique_id, None, 'Retrying', force=True, details={
+            'songs_done': 0,
+            'songs_total': count,
+            'eta_seconds': round_eta(song_rate.estimate(count)),
+        })
+
+    def retry_update(self, done, fraction):
+        fraction = max(0.0, min(1.0, fraction))
+        left = self._retry_eta.update(fraction)
+        if left is None:
+            left = song_rate.estimate(self._retry_total) * (1.0 - fraction)
+        report_progress(self.unique_id, None, 'Retrying', details={
+            'songs_done': min(done, self._retry_total),
+            'songs_total': self._retry_total,
+            'eta_seconds': round_eta(left),
+        })
+
 
 def youtube_download_percent(data):
     info = data.get('info_dict') or {}
@@ -121,14 +155,20 @@ def youtube_download_percent(data):
     return ((index - 1) + fraction) / count * 90
 
 
-def attach_spotdl_progress(downloader, progress):
+def _tracker_fraction(tracker):
+    total = tracker.parent.overall_total or 0
+    if total:
+        return tracker.parent.overall_progress / total
+    return (tracker.progress or 0) / 100
+
+
+def attach_spotdl_progress(downloader, progress, retry=False):
+    """Give the downloader a fresh progress handler that feeds ``progress``."""
     def callback(tracker, message):
-        total = tracker.parent.overall_total or 0
-        if total:
-            fraction = tracker.parent.overall_progress / total
+        if retry:
+            progress.retry_update(tracker.parent.overall_completed_tasks, _tracker_fraction(tracker))
         else:
-            fraction = (tracker.progress or 0) / 100
-        progress.download_update(fraction, message)
+            progress.download_update(_tracker_fraction(tracker), message)
 
     downloader.progress_handler = ProgressHandler(
         simple_tui=True,
@@ -156,6 +196,7 @@ def search_songs(downloader, search_query, on_resolved):
         on_resolved(0, total)
 
     songs = []
+    failed = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=settings["threads"]) as executor:
         futures = {executor.submit(reinit_song, song): song for song in simple_songs}
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
@@ -163,30 +204,82 @@ def search_songs(downloader, search_query, on_resolved):
                 songs.append(future.result())
             except Exception as exc:
                 _logger().error("%s generated an exception: %s", futures[future].display_name, exc)
+                failed.append(failure_entry(futures[future], 'metadata_failed'))
             on_resolved(done, total)
-    return songs
+    return songs, failed
 
 
-def mark_failed(unique_id, search_query, message):
+def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep):
+    """Download ``songs``, then retry the failures with the retry plan.
+
+    Returns the successful (song, path) pairs and a failure entry for each
+    song that failed every attempt. Each song gets one more try with the
+    user's provider, and up to FALLBACK_SONG_LIMIT songs then get one try per
+    fallback provider. The reason shown is the one from the
+    user's own provider, because the fallbacks often just do not have the
+    song.
+    """
+    attach_spotdl_progress(downloader, progress)
+    progress.downloading(len(songs))
+    errors_before = len(downloader.errors)
+    results = downloader.download_multiple_songs(songs)
+    progress.downloads_finished()
+
+    succeeded = [(song, path) for song, path in results if path]
+    failed = [song for song, path in results if not path]
+    reasons = reasons_by_url(downloader.errors[errors_before:], failed)
+
+    delay = retry_delay()
+    limit = fallback_song_limit()
+    for provider in retry_plan(primary):
+        batch, skipped = (failed, []) if provider == primary else (failed[:limit], failed[limit:])
+        if not batch:
+            break
+        _logger().info("Retrying %d failed songs with %s", len(batch), provider)
+        if delay:
+            sleep(delay)
+        use_provider(downloader, provider)
+        attach_spotdl_progress(downloader, progress, retry=True)
+        progress.retrying(len(batch))
+        errors_before = len(downloader.errors)
+        results = downloader.download_multiple_songs(batch)
+        failed = [song for song, path in results if not path] + skipped
+        succeeded.extend((song, path) for song, path in results if path)
+        if provider == primary:
+            reasons.update(reasons_by_url(downloader.errors[errors_before:], failed))
+
+    failures = [failure_entry(song, reasons.get(song.url, 'download_failed')) for song in failed]
+    return succeeded, failures
+
+
+def mark_failed(unique_id, search_query, message, failed_tracks=None):
     _logger().error(f"Download failed for {unique_id} ({search_query}): {message}")
-    socketio.emit('download_failed', {
+    failed_tracks = (failed_tracks or [])[:MAX_FAILED_TRACKS] or None
+    payload = {
         'unique_id': unique_id,
         'search_query': search_query,
         'message': message,
         'zip_url': None,
-    }, namespace='/')
-    download_state.mark_failed(unique_id, message)
+    }
+    if failed_tracks:
+        payload['failed_tracks'] = failed_tracks
+    download_state.mark_failed(unique_id, message, failed_tracks)
+    socketio.emit('download_failed', payload, namespace='/')
 
 
-def notify_client_download_complete(unique_id, download_url):
-    download_state.mark_completed(unique_id)
-    socketio.emit('download_complete', {
+def notify_client_download_complete(unique_id, download_url, failed_tracks=None):
+    failed_tracks = (failed_tracks or [])[:MAX_FAILED_TRACKS] or None
+    download_state.mark_completed(unique_id, failed_tracks)
+    payload = {
         'unique_id': unique_id,
         'url': download_url
-    }, namespace='/')
+    }
+    if failed_tracks:
+        payload['failed_tracks'] = failed_tracks
+    socketio.emit('download_complete', payload, namespace='/')
 
 
-def publish_zip(unique_id, search_query, download_folder):
+def publish_zip(unique_id, search_query, download_folder, failed_tracks=None):
     current = download_state.get_progress(unique_id)
     report_progress(unique_id, max(current['percent'], 95), 'Packaging', force=True)
     zip_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
@@ -209,7 +302,7 @@ def publish_zip(unique_id, search_query, download_folder):
         os.remove(zip_path)
         return
 
-    notify_client_download_complete(unique_id, f'/music/{unique_id}.zip')
+    notify_client_download_complete(unique_id, f'/music/{unique_id}.zip', failed_tracks)
 
 
 def ensure_spotify_client():
@@ -243,24 +336,26 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             "bitrate": "auto",
             "simple_tui": True,
         })
-        songs = search_songs(downloader, search_query, progress.resolved)
+        songs, failed_tracks = search_songs(downloader, search_query, progress.resolved)
         if not songs:
-            mark_failed(unique_id, search_query, "Download failed: No songs found for that search.")
+            mark_failed(
+                unique_id, search_query, "Download failed: No songs found for that search.", failed_tracks
+            )
             return
 
-        attach_spotdl_progress(downloader, progress)
-        progress.downloading(len(songs))
-        results = downloader.download_multiple_songs(songs)
-        if not any(path for _, path in results):
+        succeeded, download_failures = download_with_retries(downloader, songs, audio_format, progress)
+        failed_tracks += download_failures
+        if not succeeded:
             detail = downloader.errors[0] if downloader.errors else "No files were downloaded."
-            mark_failed(unique_id, search_query, f"Download failed: {detail[:150]}")
+            mark_failed(unique_id, search_query, f"Download failed: {detail[:150]}", failed_tracks)
             return
-        progress.downloads_finished()
 
-        if downloader.errors:
-            _logger().warning("Some tracks failed for %s: %s", unique_id, downloader.errors)
+        if failed_tracks:
+            _logger().warning("%d tracks failed for %s: %s", len(failed_tracks), unique_id, downloader.errors)
+            with open(os.path.join(download_folder, FAILED_TRACKS_FILE), 'w', encoding='utf-8') as handle:
+                handle.write(failed_tracks_text(failed_tracks))
 
-        publish_zip(unique_id, search_query, download_folder)
+        publish_zip(unique_id, search_query, download_folder, failed_tracks)
     except Exception as e:
         _logger().error(f"Unexpected error in run_spotdl for {unique_id} ({search_query}): {e}", exc_info=True)
         mark_failed(unique_id, search_query, f"An unexpected error occurred during spotdl processing: {e}")
