@@ -25,6 +25,7 @@ class DownloadState:
         self._queue = deque()
         self._failed = {}
         self._completed = {}
+        self._failed_tracks = {}
         self._progress = {}
         self._progress_emit = {}
         self._concurrent_limit = concurrent_limit
@@ -120,14 +121,28 @@ class DownloadState:
                 return {'percent': 0.0, 'message': 'Searching'}
             return dict(stored)
 
-    def mark_failed(self, unique_id, message):
+    def mark_failed(self, unique_id, message, failed_tracks=None):
         with self._lock:
             self._failed[unique_id] = (message, time.time() + retention_seconds())
+            self._set_failed_tracks_locked(unique_id, failed_tracks)
 
-    def mark_completed(self, unique_id):
+    def mark_completed(self, unique_id, failed_tracks=None):
         with self._lock:
             self._failed.pop(unique_id, None)
             self._completed[unique_id] = time.time() + retention_seconds()
+            self._set_failed_tracks_locked(unique_id, failed_tracks)
+
+    def _set_failed_tracks_locked(self, unique_id, failed_tracks):
+        if failed_tracks:
+            self._failed_tracks[unique_id] = list(failed_tracks)
+        else:
+            self._failed_tracks.pop(unique_id, None)
+
+    def failed_tracks(self, unique_id):
+        """Songs of a finished job that could not be downloaded, or None."""
+        with self._lock:
+            tracks = self._failed_tracks.get(unique_id)
+            return list(tracks) if tracks else None
 
     def pending_ids(self):
         with self._lock:
@@ -182,6 +197,10 @@ class DownloadState:
                 key: expires_at for key, expires_at in self._completed.items() if expires_at > now
             }
             timed_out = self._expire_pending_locked(now)
+            self._failed_tracks = {
+                key: tracks for key, tracks in self._failed_tracks.items()
+                if key in self._failed or key in self._completed
+            }
             return timed_out, self._promote_locked()
 
 

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { io, type Socket } from "socket.io-client";
 import { apiFetch } from "./api";
 import { useNotification } from "./components/Notification";
-import type { DownloadRequest, RequestStatus, SearchPayload } from "./components/Types";
+import type { DownloadRequest, FailedTrack, RequestStatus, SearchPayload } from "./components/Types";
 
 const STORAGE_KEY = "userDownloads";
 
@@ -15,6 +15,7 @@ type StatusResponse = {
   songs_done?: number;
   songs_total?: number;
   eta_seconds?: number;
+  failed_tracks?: FailedTrack[];
   position?: number;
 };
 
@@ -157,6 +158,8 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
           songsDone: result.data.songs_done,
           songsTotal: result.data.songs_total,
           etaSeconds: result.data.eta_seconds,
+          // The server forgets the list after a restart; keep the copy we have.
+          failedTracks: result.data.failed_tracks ?? item.failedTracks,
           queuePosition: nextStatus === "queued" ? result.data.position ?? item.queuePosition : undefined,
         });
       } catch {
@@ -233,11 +236,11 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       );
     });
 
-    socket.on("download_complete", (data: { unique_id: string; url: string }) => {
+    socket.on("download_complete", (data: { unique_id: string; url: string; failed_tracks?: FailedTrack[] }) => {
       updateRequests((current) =>
         current.map((item) =>
           item.unique_id === data.unique_id
-            ? { ...item, status: "completed", url: data.url, message: "" }
+            ? { ...item, status: "completed", url: data.url, message: "", failedTracks: data.failed_tracks }
             : item
         )
       );
@@ -245,7 +248,13 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
 
     socket.on(
       "download_failed",
-      (data: { unique_id: string; message?: string; search_query?: string; zip_url?: string | null }) => {
+      (data: {
+        unique_id: string;
+        message?: string;
+        search_query?: string;
+        zip_url?: string | null;
+        failed_tracks?: FailedTrack[];
+      }) => {
         updateRequests((current) =>
           current.map((item) =>
             item.unique_id === data.unique_id
@@ -254,6 +263,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
                   status: "failed",
                   message: data.message || item.message,
                   url: data.zip_url ?? item.url,
+                  failedTracks: data.failed_tracks,
                 }
               : item
           )

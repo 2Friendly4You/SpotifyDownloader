@@ -32,6 +32,16 @@
             "minutes": "Noch ca. {{value}} Min.",
             "hours": "Noch ca. {{value}} Std."
         },
+        "failedTracks": {
+            "summary_one": "{{count}} Song fehlerhaft",
+            "summary_other": "{{count}} Songs fehlerhaft",
+            "reasons": {
+                "not_found": "Nicht gefunden",
+                "download_failed": "Download fehlgeschlagen",
+                "conversion_failed": "Konvertierung fehlgeschlagen",
+                "metadata_failed": "Metadaten nicht abrufbar"
+            }
+        },
         "status": {
             "queued": "In der Warteschlange",
             "pending": "Ausstehend",
@@ -48,7 +58,8 @@
             "Processing": "Verarbeitung",
             "Done": "Fertig",
             "Skipped": "Übersprungen",
-            "Error": "Fehler"
+            "Error": "Fehler",
+            "Retrying": "Erneuter Versuch"
         }
     },
     "Alert": {
