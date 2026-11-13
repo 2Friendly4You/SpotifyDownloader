@@ -44,7 +44,8 @@ function RequestComponent({
   const failedTracks =
     request.status === "completed" || request.status === "failed" ? request.failedTracks ?? [] : [];
 
-  const showActions = request.status === "completed" || request.status === "failed";
+  const cancellable = request.status === "pending" || request.status === "queued";
+  const showActions = request.status === "completed" || request.status === "failed" || cancellable;
 
   return (
     <div className={`${styles.root} ${styles[request.status] || ""}`}>
@@ -123,6 +124,11 @@ function RequestComponent({
           {request.status === "failed" && (
             <button type="button" className={styles.retryButton} onClick={() => retryRequest(request.unique_id)}>
               <Trans i18nKey="RequestComponent.retry">Retry</Trans>
+            </button>
+          )}
+          {cancellable && (
+            <button type="button" className={styles.cancelButton} onClick={handleClose}>
+              <Trans i18nKey="RequestComponent.cancel">Cancel</Trans>
             </button>
           )}
         </div>

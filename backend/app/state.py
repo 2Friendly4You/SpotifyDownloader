@@ -26,6 +26,10 @@ class DownloadState:
         self._failed = {}
         self._completed = {}
         self._failed_tracks = {}
+        # Cancelled job ids stay here for a while after the job released its
+        # slot, so yt-dlp threads that are still finishing a request stop at
+        # their next progress hook instead of downloading to the end.
+        self._cancelled = {}
         self._progress = {}
         self._progress_emit = {}
         self._concurrent_limit = concurrent_limit
@@ -68,6 +72,33 @@ class DownloadState:
                     del self._queue[index]
                     return True
             return False
+
+    def request_cancel(self, unique_id):
+        """Cancel a job. Returns 'queued', 'running' or None if it is unknown.
+
+        A queued job is simply removed. A running job is flagged; the worker
+        stops at its next check and releases its slot as usual.
+        """
+        with self._lock:
+            for index, job in enumerate(self._queue):
+                if job['unique_id'] == unique_id:
+                    del self._queue[index]
+                    return 'queued'
+            if unique_id in self._pending:
+                self._cancelled[unique_id] = time.time()
+                return 'running'
+            return None
+
+    def is_cancelled(self, unique_id):
+        with self._lock:
+            return unique_id in self._cancelled
+
+    def forget(self, unique_id):
+        """Drop every trace of a finished job, e.g. after it was cancelled late."""
+        with self._lock:
+            self._failed.pop(unique_id, None)
+            self._completed.pop(unique_id, None)
+            self._failed_tracks.pop(unique_id, None)
 
     def _promote_locked(self):
         promoted = []
@@ -201,6 +232,10 @@ class DownloadState:
                 key: expires_at for key, expires_at in self._completed.items() if expires_at > now
             }
             timed_out = self._expire_pending_locked(now)
+            self._cancelled = {
+                key: when for key, when in self._cancelled.items()
+                if key in self._pending or now - when < PENDING_TTL_SECONDS
+            }
             self._failed_tracks = {
                 key: tracks for key, tracks in self._failed_tracks.items()
                 if key in self._failed or key in self._completed
