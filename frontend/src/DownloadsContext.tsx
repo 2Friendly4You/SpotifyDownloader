@@ -43,7 +43,9 @@ type QueueUpdateEntry = {
   position: number;
 };
 
-function cancelQueuedOnServer(uniqueId: string) {
+// Cancels a queued or running download. A running one is stopped and its
+// files are deleted on the server.
+function cancelOnServer(uniqueId: string) {
   void apiFetch(`/api/search/${uniqueId}`, { method: "DELETE" });
 }
 
@@ -240,6 +242,10 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       );
     });
 
+    socket.on("download_cancelled", (data: { unique_id: string }) => {
+      updateRequests((current) => current.filter((item) => item.unique_id !== data.unique_id));
+    });
+
     socket.on("download_complete", (data: { unique_id: string; url: string; failed_tracks?: FailedTrack[] }) => {
       updateRequests((current) =>
         current.map((item) =>
@@ -326,8 +332,8 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
   const removeRequest = useCallback((uniqueId: string) => {
     updateRequests((current) => {
       const existing = current.find((item) => item.unique_id === uniqueId);
-      if (existing?.status === "queued") {
-        cancelQueuedOnServer(uniqueId);
+      if (existing?.status === "queued" || existing?.status === "pending") {
+        cancelOnServer(uniqueId);
       }
       return current.filter((item) => item.unique_id !== uniqueId);
     });
@@ -336,8 +342,8 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
   const clearRequests = useCallback(() => {
     setRequests((current) => {
       for (const item of current) {
-        if (item.status === "queued") {
-          cancelQueuedOnServer(item.unique_id);
+        if (item.status === "queued" || item.status === "pending") {
+          cancelOnServer(item.unique_id);
         }
       }
       return [];

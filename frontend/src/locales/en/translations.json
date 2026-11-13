@@ -24,6 +24,7 @@
         "delete": "×",
         "remove": "Remove request",
         "retry": "Retry",
+        "cancel": "Cancel",
         "errorLog": "Error Log",
         "queuePosition": "Position {{position}}",
         "searchCount": "{{done}}/{{total}} songs",

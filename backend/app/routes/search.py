@@ -5,7 +5,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from app.config import VALID_OUTPUT_FORMATS
-from app.downloads import emit_queue_update, expire_download_state, start_download_job
+from app.downloads import cancel_running_job, emit_queue_update, expire_download_state, start_download_job
 from app.searches import record_search
 from app.state import download_state
 from app.validation import is_youtube_url, validate_format_options, validate_input
@@ -97,12 +97,16 @@ def search():
 
 
 @search_bp.route('/api/search/<unique_id>', methods=['DELETE'])
-def cancel_queued_search(unique_id):
-    if download_state.cancel_queued(unique_id):
+def cancel_search(unique_id):
+    outcome = download_state.request_cancel(unique_id)
+    if outcome == 'queued':
         emit_queue_update()
         return jsonify({'status': 'success', 'cancelled': True})
+    if outcome == 'running':
+        cancel_running_job(unique_id)
+        return jsonify({'status': 'success', 'cancelled': True, 'running': True}), 202
     return jsonify({
         'status': 'error',
-        'message': 'Request is not queued.',
+        'message': 'Request is not running or queued.',
         'cancelled': False,
     }), 404

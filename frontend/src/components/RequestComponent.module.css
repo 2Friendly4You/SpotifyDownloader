@@ -92,8 +92,15 @@
 }
 
 .downloadButton,
-.retryButton {
+.retryButton,
+.cancelButton {
   margin: 0;
+}
+
+.cancelButton {
+  background-color: transparent;
+  color: inherit;
+  border: 1px solid var(--border-color);
 }
 
 .downloadButton {

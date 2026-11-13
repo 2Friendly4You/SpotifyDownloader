@@ -114,13 +114,20 @@ def test_search_starts_a_download_and_reports_it_pending(client):
     assert client.get("/api/download_counter").get_json()["total"] == before + 1
 
 
-def test_running_search_cannot_be_cancelled(client):
+def test_running_search_can_be_cancelled(client, monkeypatch):
+    stopped = []
+    monkeypatch.setattr("app.routes.search.cancel_running_job", stopped.append)
     started = client.post("/api/search", json=SONG)
     unique_id = started.get_json()["unique_id"]
     response = client.delete(f"/api/search/{unique_id}")
-    assert response.status_code == 404
-    assert response.get_json()["cancelled"] is False
-    assert response.get_json()["message"] == "Request is not queued."
+    assert response.status_code == 202
+    assert response.get_json()["cancelled"] is True
+    assert response.get_json()["running"] is True
+    assert stopped == [unique_id]
+
+    missing = client.delete("/api/search/does-not-exist")
+    assert missing.status_code == 404
+    assert missing.get_json()["cancelled"] is False
 
 
 def test_second_search_waits_when_the_concurrency_limit_is_full(client):

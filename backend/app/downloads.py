@@ -1,3 +1,4 @@
+import asyncio
 import concurrent.futures
 import os
 import shutil
@@ -12,6 +13,8 @@ from spotdl.utils.config import SPOTIFY_OPTIONS
 from spotdl.utils.search import get_simple_songs, reinit_song
 from spotdl.utils.spotify import SpotifyClient, SpotifyError
 
+from app import cancellation
+from app.cancellation import JobCancelled
 from app.config import MUSIC_DIR
 from app.extensions import socketio
 from app.progress import EtaEstimator, SongProgress, round_eta, song_rate
@@ -165,6 +168,8 @@ def youtube_download_percent(data):
 def attach_spotdl_progress(downloader, progress):
     """Give the downloader a fresh progress handler that feeds ``progress``."""
     def callback(tracker, message):
+        # Raising here aborts the yt-dlp download or spotDL step that reported.
+        check_cancelled(progress.unique_id)
         progress.song_update(id(tracker), tracker.progress, message)
 
     downloader.progress_handler = ProgressHandler(
@@ -174,7 +179,7 @@ def attach_spotdl_progress(downloader, progress):
     )
 
 
-def search_songs(downloader, search_query, on_resolved):
+def search_songs(downloader, search_query, on_resolved, is_cancelled=None):
     """spotDL's parse_query, reporting each song whose metadata is resolved.
 
     Mirrors spotdl.utils.search.parse_query (spotDL 4.6.0) so the search
@@ -194,15 +199,21 @@ def search_songs(downloader, search_query, on_resolved):
 
     songs = []
     failed = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=settings["threads"]) as executor:
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=settings["threads"])
+    try:
         futures = {executor.submit(reinit_song, song): song for song in simple_songs}
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+            if is_cancelled is not None and is_cancelled():
+                raise JobCancelled()
             try:
                 songs.append(future.result())
             except Exception as exc:
                 _logger().error("%s generated an exception: %s", futures[future].display_name, exc)
                 failed.append(failure_entry(futures[future], 'metadata_failed'))
             on_resolved(done, total)
+    finally:
+        # Do not wait for lookups that are no longer needed after a cancel.
+        executor.shutdown(wait=False, cancel_futures=True)
     return songs, failed
 
 
@@ -220,6 +231,7 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
     progress.downloading(len(songs))
     errors_before = len(downloader.errors)
     results = downloader.download_multiple_songs(songs)
+    check_cancelled(progress.unique_id)
     progress.downloads_finished()
 
     succeeded = [(song, path) for song, path in results if path]
@@ -232,6 +244,7 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
         batch, skipped = (failed, []) if provider == primary else (failed[:limit], failed[limit:])
         if not batch:
             break
+        check_cancelled(progress.unique_id)
         _logger().info("Retrying %d failed songs with %s", len(batch), provider)
         if delay:
             sleep(delay)
@@ -240,6 +253,7 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
         progress.retrying(len(batch))
         errors_before = len(downloader.errors)
         results = downloader.download_multiple_songs(batch)
+        check_cancelled(progress.unique_id)
         failed = [song for song, path in results if not path] + skipped
         succeeded.extend((song, path) for song, path in results if path)
         if provider == primary:
@@ -247,6 +261,27 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
 
     failures = [failure_entry(song, reasons.get(song.url, 'download_failed')) for song in failed]
     return succeeded, failures
+
+
+def check_cancelled(unique_id):
+    if download_state.is_cancelled(unique_id):
+        raise JobCancelled(unique_id)
+
+
+def cancel_running_job(unique_id):
+    """Interrupt a running job after DownloadState flagged it as cancelled."""
+    killed = cancellation.stop(unique_id)
+    _logger().info("Cancelling download %s (killed processes: %s)", unique_id, killed or 'none')
+
+
+def finish_cancelled(unique_id):
+    """Remove everything a cancelled job left behind and tell the clients."""
+    zip_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
+    if os.path.exists(zip_path):
+        os.remove(zip_path)
+    download_state.forget(unique_id)
+    socketio.emit('download_cancelled', {'unique_id': unique_id}, namespace='/')
+    _logger().info("Download %s was cancelled and cleaned up", unique_id)
 
 
 def mark_failed(unique_id, search_query, message, failed_tracks=None):
@@ -333,7 +368,11 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             "bitrate": "auto",
             "simple_tui": True,
         })
-        songs, failed_tracks = search_songs(downloader, search_query, progress.resolved)
+        cancellation.register(unique_id, cancellation.loop_stopper(downloader.loop))
+        check_cancelled(unique_id)
+        songs, failed_tracks = search_songs(
+            downloader, search_query, progress.resolved, lambda: download_state.is_cancelled(unique_id)
+        )
         if not songs:
             mark_failed(
                 unique_id, search_query, "Download failed: No songs found for that search.", failed_tracks
@@ -352,16 +391,26 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             with open(os.path.join(download_folder, FAILED_TRACKS_FILE), 'w', encoding='utf-8') as handle:
                 handle.write(failed_tracks_text(failed_tracks))
 
+        check_cancelled(unique_id)
         publish_zip(unique_id, search_query, download_folder, failed_tracks)
+    except (JobCancelled, asyncio.CancelledError):
+        pass
     except Exception as e:
-        _logger().error(f"Unexpected error in run_spotdl for {unique_id} ({search_query}): {e}", exc_info=True)
-        mark_failed(unique_id, search_query, f"An unexpected error occurred during spotdl processing: {e}")
+        if not download_state.is_cancelled(unique_id):
+            _logger().error(f"Unexpected error in run_spotdl for {unique_id} ({search_query}): {e}", exc_info=True)
+            mark_failed(unique_id, search_query, f"An unexpected error occurred during spotdl processing: {e}")
     finally:
+        cancellation.unregister(unique_id)
         try:
+            cancelled = download_state.is_cancelled(unique_id)
+            if cancelled:
+                cancellation.kill_job_processes(unique_id)
             if downloader is not None and not downloader.loop.is_closed():
                 downloader.loop.close()
             if os.path.exists(download_folder):
-                shutil.rmtree(download_folder)
+                shutil.rmtree(download_folder, ignore_errors=cancelled)
+            if cancelled:
+                finish_cancelled(unique_id)
         finally:
             start_promoted_jobs(download_state.release(unique_id))
 
@@ -406,20 +455,30 @@ def download_from_youtube(unique_id, url, output_format):
             if file_in_dir.endswith(('.webp', '.jpg', '.png')):
                 os.remove(os.path.join(download_folder, file_in_dir))
 
+        check_cancelled(unique_id)
         publish_zip(unique_id, url, download_folder)
 
+    except JobCancelled:
+        pass
     except Exception as e:
-        _logger().error(f"YouTubeDL error for {unique_id} processing {url}: {e}", exc_info=True)
-        mark_failed(unique_id, url, f"YouTube download failed: {e}")
+        if not download_state.is_cancelled(unique_id):
+            _logger().error(f"YouTubeDL error for {unique_id} processing {url}: {e}", exc_info=True)
+            mark_failed(unique_id, url, f"YouTube download failed: {e}")
     finally:
         try:
+            cancelled = download_state.is_cancelled(unique_id)
+            if cancelled:
+                cancellation.kill_job_processes(unique_id)
             if os.path.exists(download_folder):
-                shutil.rmtree(download_folder)
+                shutil.rmtree(download_folder, ignore_errors=cancelled)
+            if cancelled:
+                finish_cancelled(unique_id)
         finally:
             start_promoted_jobs(download_state.release(unique_id))
 
 
 def youtube_progress_hook(unique_id, data, eta=None):
+    check_cancelled(unique_id)
     status = data.get('status')
     if status == 'downloading':
         percent = youtube_download_percent(data)
@@ -431,6 +490,7 @@ def youtube_progress_hook(unique_id, data, eta=None):
 
 
 def youtube_postprocessor_hook(unique_id, data):
+    check_cancelled(unique_id)
     if data.get('status') != 'started':
         return
     name = data.get('postprocessor') or ''
