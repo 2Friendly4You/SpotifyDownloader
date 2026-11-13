@@ -27,6 +27,8 @@
         "errorLog": "Fehlerprotokoll",
         "queuePosition": "Position {{position}}",
         "searchCount": "{{done}}/{{total}} Songs",
+        "running_one": "{{count}} läuft gerade",
+        "running_other": "{{count}} laufen gerade",
         "eta": {
             "underMinute": "Noch < 1 Min.",
             "minutes": "Noch ca. {{value}} Min.",

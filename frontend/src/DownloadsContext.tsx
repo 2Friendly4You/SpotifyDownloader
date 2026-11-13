@@ -14,6 +14,7 @@ type StatusResponse = {
   progress_message?: string;
   songs_done?: number;
   songs_total?: number;
+  songs_running?: number;
   eta_seconds?: number;
   failed_tracks?: FailedTrack[];
   position?: number;
@@ -33,6 +34,7 @@ type ProgressEvent = {
   message?: string;
   songs_done?: number;
   songs_total?: number;
+  songs_running?: number;
   eta_seconds?: number;
 };
 
@@ -157,6 +159,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
           progressMessage: result.data.progress_message ?? item.progressMessage,
           songsDone: result.data.songs_done,
           songsTotal: result.data.songs_total,
+          songsRunning: result.data.songs_running,
           etaSeconds: result.data.eta_seconds,
           // The server forgets the list after a restart; keep the copy we have.
           failedTracks: result.data.failed_tracks ?? item.failedTracks,
@@ -200,6 +203,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
                 // missing field means the value no longer applies.
                 songsDone: data.songs_done,
                 songsTotal: data.songs_total,
+                songsRunning: data.songs_running,
                 etaSeconds: data.eta_seconds,
               }
             : item

@@ -1,7 +1,7 @@
 import pytest
 
 from app import downloads
-from app.progress import EtaEstimator, SongRate, round_eta
+from app.progress import EtaEstimator, SongProgress, SongRate, round_eta
 from app.state import DownloadState, download_state
 
 
@@ -185,12 +185,16 @@ def test_spotdl_progress_moves_through_the_phases(emitted, monkeypatch):
     assert emitted[-1][1]["message"] == "Downloading"
     assert emitted[-1][1]["eta_seconds"] == 50
 
-    clock.now += 30
-    progress.download_update(0.5, "Downloading")
+    clock.now += 1
+    for song in range(4):
+        progress.song_update(song, 100, "Done")
+    clock.now += 29
+    progress.song_update(4, 100, "Done")
     last = emitted[-1][1]
     assert last["progress"] == 50.0
     assert last["eta_seconds"] == 30
-    assert "songs_done" not in last
+    assert last["songs_done"] == 5
+    assert last["songs_total"] == 10
 
 
 def test_youtube_hook_adds_an_eta_once_it_has_data(emitted, monkeypatch):
@@ -204,3 +208,53 @@ def test_youtube_hook_adds_an_eta_once_it_has_data(emitted, monkeypatch):
     clock.now += 10
     downloads.youtube_progress_hook("job", {**data, "downloaded_bytes": 50}, eta)
     assert emitted[-1][1]["eta_seconds"] == 10
+
+
+def test_song_progress_counts_finished_and_running_songs():
+    songs = SongProgress(4)
+    assert songs.update("a", 25, "Searching for song") == (0, 1, 0.0625)
+    assert songs.update("b", 40, "Getting audio meta") == (0, 2, pytest.approx(0.1625))
+    assert songs.update("a", 100, "Done") == (1, 1, pytest.approx(0.35))
+    # A failed song is finished too: spotDL will not touch it again.
+    assert songs.update("b", 40, "Error") == (2, 0, pytest.approx(0.5))
+    # A late, lower update never moves the bar backwards.
+    assert songs.update("c", 0, "Searching for song")[2] == pytest.approx(0.5)
+    assert songs.update("a", 95, "Embedding metadata") == (2, 1, pytest.approx(0.5))
+
+
+def test_search_counter_reaches_the_total_in_a_burst(emitted, monkeypatch):
+    # spotDL's workers often finish several songs within a few milliseconds.
+    # Throttled emits used to drop the last ones, so the card jumped from
+    # "75/80" straight to downloading.
+    clock = FakeClock()
+    monkeypatch.setattr("app.state.time.monotonic", clock)
+    progress = downloads.SpotdlProgress("job", clock=clock)
+    progress.searching()
+    for done in range(0, 81):
+        progress.resolved(done, 80)
+    counts = [data["songs_done"] for _, data in emitted if data.get("message") == "Searching" and "songs_done" in data]
+    assert counts == list(range(0, 81))
+
+
+def test_download_card_shows_one_calm_step(emitted, monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr("app.state.time.monotonic", clock)
+    progress = downloads.SpotdlProgress("job", clock=clock)
+    progress.downloading(3)
+    for key, percent, message in [
+        ("a", 25, "Searching for song"),
+        ("b", 25, "Searching for song"),
+        ("a", 40, "Getting audio meta"),
+        ("b", 90, "Converting"),
+        ("a", 100, "Done"),
+        ("b", 100, "Done"),
+        ("c", 100, "Done"),
+    ]:
+        clock.now += 1
+        progress.song_update(key, percent, message)
+    messages = {data["message"] for _, data in emitted}
+    assert messages == {"Downloading"}
+    progress_values = [data["progress"] for _, data in emitted]
+    assert progress_values == sorted(progress_values)
+    assert emitted[-1][1]["songs_done"] == 3
+    assert emitted[-1][1]["progress"] == 95.0
