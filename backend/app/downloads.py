@@ -13,7 +13,7 @@ from spotdl.utils.config import SPOTIFY_OPTIONS
 from spotdl.utils.search import get_simple_songs, reinit_song
 from spotdl.utils.spotify import SpotifyClient, SpotifyError
 
-from app import cancellation
+from app import cancellation, history
 from app.cancellation import JobCancelled
 from app.config import MUSIC_DIR
 from app.extensions import socketio
@@ -100,6 +100,7 @@ class SpotdlProgress:
         self.total = total
         self._eta = ThroughputEta(total, workers=self._workers, clock=self._clock)
         self._songs = SongProgress(total)
+        history.set_songs(self.unique_id, total)
         report_progress(self.unique_id, SEARCH_DONE_PERCENT, 'Downloading', force=True, details={
             'songs_done': 0,
             'songs_total': total,
@@ -170,6 +171,7 @@ def publish_title(unique_id, title):
     if not title or title == download_state.title(unique_id):
         return
     download_state.set_title(unique_id, title)
+    history.set_title(unique_id, title)
     socketio.emit('download_title', {'unique_id': unique_id, 'title': title}, namespace='/')
 
 
@@ -280,6 +282,7 @@ def finish_cancelled(unique_id):
     if os.path.exists(zip_path):
         os.remove(zip_path)
     download_state.forget(unique_id)
+    history.finished(unique_id, 'cancelled')
     socketio.emit('download_cancelled', {'unique_id': unique_id}, namespace='/')
     _logger().info("Download %s was cancelled and cleaned up", unique_id)
 
@@ -299,6 +302,7 @@ def mark_failed(unique_id, search_query, message, failed_tracks=None):
     if failed_tracks:
         payload['failed_tracks'] = failed_tracks
     download_state.mark_failed(unique_id, message, failed_tracks)
+    history.finished(unique_id, 'failed', message=message, failed_tracks=failed_tracks)
     socketio.emit('download_failed', payload, namespace='/')
 
 
@@ -329,7 +333,9 @@ def publish_zip(unique_id, search_query, download_folder, failed_tracks=None):
 
     try:
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            has_files = any(not info.is_dir() for info in zf.infolist())
+            files = [info for info in zf.infolist() if not info.is_dir()]
+            has_files = bool(files)
+            songs_saved = sum(1 for info in files if not info.filename.endswith('.txt'))
     except zipfile.BadZipFile:
         mark_failed(unique_id, search_query, "Download failed: The downloaded archive is corrupted.")
         os.remove(zip_path)
@@ -341,6 +347,10 @@ def publish_zip(unique_id, search_query, download_folder, failed_tracks=None):
         return
 
     write_zip_title(zip_path, download_state.title(unique_id))
+    history.finished(
+        unique_id, 'completed', size_bytes=os.path.getsize(zip_path), songs_saved=songs_saved,
+        failed_tracks=failed_tracks,
+    )
     notify_client_download_complete(unique_id, job_download_url(unique_id), failed_tracks)
 
 
@@ -521,6 +531,7 @@ def emit_queue_update():
 
 def start_download_job(job, from_queue=False):
     unique_id = job['unique_id']
+    history.started(unique_id)
     if from_queue:
         socketio.emit('download_started', {
             'unique_id': unique_id,
@@ -551,6 +562,7 @@ def expire_download_state():
     timed_out, promoted = download_state.expire_stale()
     for unique_id in timed_out:
         _logger().error("Download %s timed out and released its concurrency slot", unique_id)
+        history.finished(unique_id, 'failed', message='Download timed out.')
         socketio.emit('download_failed', {
             'unique_id': unique_id,
             'message': 'Download timed out.',

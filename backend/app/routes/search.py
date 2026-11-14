@@ -1,3 +1,4 @@
+import time
 import uuid
 from collections import deque
 from datetime import datetime
@@ -6,6 +7,7 @@ from flask import Blueprint, jsonify, request
 
 from app.config import VALID_OUTPUT_FORMATS
 from app.downloads import cancel_running_job, emit_queue_update, expire_download_state, start_download_job
+from app import history
 from app.searches import record_search
 from app.state import download_state
 from app.validation import is_youtube_url, validate_format_options, validate_input
@@ -34,6 +36,7 @@ def search():
 
     request.environ['search_log_data'] = {
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'time': time.time(),
         'ip': request.remote_addr,
         'search_query': search_query,
         'audio_format': audio_format,
@@ -75,6 +78,7 @@ def search():
         }), 429
 
     record_search()
+    history.created(job, queued=outcome != 'started')
 
     if outcome == 'started':
         start_download_job(job)
@@ -100,6 +104,7 @@ def search():
 def cancel_search(unique_id):
     outcome = download_state.request_cancel(unique_id)
     if outcome == 'queued':
+        history.finished(unique_id, 'cancelled')
         emit_queue_update()
         return jsonify({'status': 'success', 'cancelled': True})
     if outcome == 'running':

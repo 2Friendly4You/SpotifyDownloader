@@ -1,88 +1,598 @@
-.root {
-  margin: 2rem auto;
-  padding: 2rem;
-  max-width: 1000px;
-  width: 100%;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  background: var(--secondary);
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  text-align: left;
-}
+/* The admin page uses the same building blocks as the main page: the
+   .container column, plain section headings, the request-card surface,
+   the green primary button and the outlined secondary button. */
 
-.root h1 {
-  margin-bottom: 1rem;
-  color: var(--text);
-}
-
-.root p,
-.root li {
-  color: var(--text);
+.page {
+  max-width: 960px;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 1.5rem;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.header h1 {
+  margin-bottom: 0.15rem;
 }
 
 .headerActions {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.75;
+}
+
+.empty {
+  margin: 0;
+  padding: 1rem;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 12px;
+  text-align: center;
+  opacity: 0.8;
 }
 
 .section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: var(--background);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  margin: 2rem 0;
+  min-width: 0;
 }
 
-.loginForm,
-.limitForm {
+.sectionHeader {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 360px;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
 }
 
-.requestLog {
-  list-style: none;
-  padding: 0;
+.sectionHeader h2 {
   margin: 0;
+}
+
+.card {
   display: flex;
   flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 1rem 1rem 0.95rem;
+  margin: 0 0 0.85rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--secondary) 72%, var(--background));
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
   gap: 0.75rem;
-  word-break: break-word;
 }
 
-.backLink {
-  color: var(--accent);
+.cardTitle {
+  flex: 1;
+  min-width: 0;
 }
 
-.error {
-  color: var(--danger);
+.cardTitle h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.message {
-  color: var(--accent);
+.source {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buttons and links */
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  border-color: var(--primary);
+  opacity: 1;
+}
+
+.primaryLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  opacity: 0.9;
 }
 
 .dangerButton {
+  padding: 0.6rem 1.1rem;
   background: var(--danger);
-  color: #fff;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.limitRow button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.textLink {
+  color: var(--accent);
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+/* Login */
+
+.loginCard {
+  composes: card;
+  max-width: 420px;
+  gap: 0.5rem;
+}
+
+.loginCard label {
+  margin: 0.5rem 0 0;
+}
+
+.loginCard button {
+  margin-top: 0.5rem;
+}
+
+/* KPI tiles */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 0.75rem;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  border: 1.5px solid var(--border-color);
+  border-left: 4px solid var(--primary);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--secondary) 72%, var(--background));
+}
+
+.kpi.warn {
+  border-left-color: #d89614;
+}
+
+.kpi.bad {
+  border-left-color: var(--danger);
+}
+
+.kpiLabel {
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.kpiValue {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiHint {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+/* Status badges */
+
+.badge {
+  flex: none;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.badge_running,
+.badge_completed {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--text);
+}
+
+.badge_queued {
+  background: color-mix(in srgb, #d89614 25%, transparent);
+}
+
+.badge_failed {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.badge_cancelled {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+/* Facts: label over value, in a grid that collapses on phones */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 0.6rem 1rem;
+  margin: 0;
+}
+
+.facts dt {
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.wideFact {
+  grid-column: 1 / -1;
+}
+
+/* "vor 4 Stunden · 2 min 45 s · 13 MB · 16 Songs" */
+.factLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0;
+  margin: 0;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.factLine span:not(:last-child)::after {
+  content: "·";
+  margin: 0 0.5rem;
+  opacity: 0.5;
+}
+
+.ok {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Filters */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  padding: 0.35rem 0.85rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.chipActive {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  font-weight: 600;
+}
+
+.search {
+  flex: 1 1 200px;
+  width: auto;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Chart */
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.legend {
+  display: flex;
+  gap: 0.9rem;
+  font-size: 0.8rem;
+}
+
+.legendOk::before,
+.legendBad::before {
+  content: "";
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.35rem;
+  border-radius: 3px;
+  vertical-align: -0.05rem;
+  background: var(--primary);
+}
+
+.legendBad::before {
+  background: var(--danger);
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 0.3rem;
+  align-items: end;
+  height: 140px;
+  padding-top: 0.25rem;
+}
+
+.chartDay {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  height: 100%;
+  min-width: 0;
+}
+
+.chartBar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--primary);
+  overflow: hidden;
+}
+
+.chartFailed {
+  display: block;
+  width: 100%;
+  background: var(--danger);
+}
+
+.chartLabel {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  text-align: center;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stats table */
+
+.tableWrap {
+  overflow-x: auto;
+  margin-bottom: 0.6rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 0.85rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.table thead th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.table tbody th {
+  text-align: left;
+  font-weight: 500;
+}
+
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Storage */
+
+.diskBar {
+  position: relative;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+
+.diskOther,
+.diskMusic {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+
+.diskOther {
+  background: color-mix(in srgb, var(--text) 30%, var(--border-color));
+}
+
+.diskMusic {
+  background: var(--primary);
+}
+
+.cleanupRow,
+.dangerZone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cleanupRow select {
+  width: auto;
+  padding: 0.5rem 0.75rem;
+}
+
+.inlineLabel {
+  flex: 1 1 220px;
+  margin: 0;
+  font-weight: 400;
+}
+
+.dangerZone {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Settings */
+
+.limitRow {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.limitRow input {
+  width: 7rem;
+}
+
+/* Request log */
+
+.card summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.logList {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.logList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+}
+
+.logQuery {
+  flex: 1 1 240px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {
-  .root {
-    margin: 0;
-    padding: 1rem;
-    border-radius: 0;
+  .kpiValue {
+    font-size: 1.35rem;
+  }
+
+  .chart {
+    height: 110px;
+    gap: 0.15rem;
+  }
+
+  .chartLabel {
+    font-size: 0.62rem;
+  }
+
+  .table {
+    font-size: 0.85rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.45rem 0.4rem;
+    white-space: normal;
+  }
+
+  .table tbody th {
+    padding-left: 0.7rem;
+  }
+
+  .kpi {
+    padding: 0.75rem 0.8rem;
   }
 }
