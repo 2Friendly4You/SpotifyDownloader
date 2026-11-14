@@ -43,6 +43,18 @@
   flex-wrap: wrap;
 }
 
+/* The way out of the dialog is secondary, so it must not look like the confirm button. */
+.cancelButton {
+  background-color: transparent;
+  color: var(--text);
+  border: 1px solid var(--border-color);
+}
+
+.danger {
+  background-color: var(--danger);
+  color: white;
+}
+
 @keyframes slideIn {
   from {
     opacity: 0;

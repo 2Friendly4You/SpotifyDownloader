@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { io, type Socket } from "socket.io-client";
 import { apiFetch } from "./api";
 import { useNotification } from "./components/Notification";
+import i18n from "./i18n";
 import type { DownloadRequest, FailedTrack, RequestStatus, SearchPayload } from "./components/Types";
 
 const STORAGE_KEY = "userDownloads";
@@ -278,7 +279,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
               : item
           )
         );
-        notify("error", "Download Failed", `${data.search_query || "Item"}: ${data.message || ""}`);
+        notify("error", i18n.t("Toasts.downloadFailedTitle"), `${data.search_query || ""}: ${data.message || ""}`);
       }
     );
 
@@ -313,18 +314,16 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
         setDownloadCount((count) => count + 1);
         notify(
           "success",
-          queued ? "Queued" : "Request Sent",
-          queued
-            ? `Download for "${payload.search_query}" is waiting for a free slot.`
-            : `Download for "${payload.search_query}" has been initiated.`
+          i18n.t(queued ? "Toasts.queuedTitle" : "Toasts.sentTitle"),
+          i18n.t(queued ? "Toasts.queuedMessage" : "Toasts.sentMessage", { query: payload.search_query })
         );
         return true;
       }
 
-      notify("error", "Search Error", result.data.message || "Failed to start download.");
+      notify("error", i18n.t("Toasts.searchErrorTitle"), result.data.message || i18n.t("Toasts.searchErrorMessage"));
       return false;
     } catch {
-      notify("error", "Error", "Network error or server unreachable. Please check your connection.");
+      notify("error", i18n.t("Toasts.errorTitle"), i18n.t("Toasts.networkMessage"));
       return false;
     }
   }, [notify, upsertRequest]);
@@ -370,18 +369,18 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       const result = await apiFetch<StatusResponse>(`/api/status/${request.unique_id}`);
       if (result.data.status === "completed" && (result.data.url || request.url)) {
         triggerBrowserDownload(result.data.url || request.url || "");
-        notify("success", "Download Started", `Downloading ${request.searchQuery}.zip...`);
+        notify("success", i18n.t("Toasts.downloadStartedTitle"), i18n.t("Toasts.downloadStartedMessage", { query: request.searchQuery }));
         return;
       }
       if (result.data.status === "failed" && (result.data.url || request.url)) {
         triggerBrowserDownload(result.data.url || request.url || "");
-        notify("info", "Error Log", `Downloading error archive for ${request.searchQuery}.`);
+        notify("info", i18n.t("Toasts.errorLogTitle"), i18n.t("Toasts.errorLogMessage", { query: request.searchQuery }));
         return;
       }
-      notify("error", "Error", "Failed to start download. Maybe the file is no longer available.");
+      notify("error", i18n.t("Toasts.errorTitle"), i18n.t("Toasts.fileGoneMessage"));
       removeRequest(request.unique_id);
     } catch {
-      notify("error", "Error", "Failed to start download. Maybe the file is no longer available.");
+      notify("error", i18n.t("Toasts.errorTitle"), i18n.t("Toasts.fileGoneMessage"));
       removeRequest(request.unique_id);
     }
   }, [notify, removeRequest]);

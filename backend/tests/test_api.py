@@ -124,6 +124,9 @@ def test_running_search_can_be_cancelled(client, monkeypatch):
     assert response.get_json()["cancelled"] is True
     assert response.get_json()["running"] is True
     assert stopped == [unique_id]
+    # The worker thread is still winding down, but the job must already look gone.
+    status = client.get(f"/api/status/{unique_id}")
+    assert status.status_code == 404
 
     missing = client.delete("/api/search/does-not-exist")
     assert missing.status_code == 404

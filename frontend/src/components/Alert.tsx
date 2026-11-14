@@ -15,9 +15,12 @@ type AlertProps = {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
 };
 
-function Alert({ isOpen, title, message, onConfirm, onCancel }: AlertProps) {
+function Alert({ isOpen, title, message, onConfirm, onCancel, confirmLabel, cancelLabel, danger }: AlertProps) {
   useEffect(() => {
     if (isOpen) {
       // Store the element that had focus before the alert opened
@@ -84,15 +87,15 @@ function Alert({ isOpen, title, message, onConfirm, onCancel }: AlertProps) {
 
   return (
     <div className={styles.overlay} onClick={handleOverlayClick}>
-      <div className={styles.alert}>
-        <h3>{title}</h3>
-        <p>{message}</p>
+      <div className={styles.alert} role="alertdialog" aria-modal="true" aria-labelledby="alert-title" aria-describedby="alert-message">
+        <h3 id="alert-title">{title}</h3>
+        <p id="alert-message">{message}</p>
         <div className={styles.buttonContainer}>
           <button onClick={onCancel} className={styles.cancelButton}>
-            <Trans i18nKey="Alert.cancel">Cancel</Trans>
+            {cancelLabel ?? <Trans i18nKey="Alert.cancel">Cancel</Trans>}
           </button>
-          <button onClick={onConfirm} className={styles.confirmButton}>
-            <Trans i18nKey="Alert.ok">OK</Trans>
+          <button onClick={onConfirm} className={`${styles.confirmButton} ${danger ? styles.danger : ""}`}>
+            {confirmLabel ?? <Trans i18nKey="Alert.ok">OK</Trans>}
           </button>
         </div>
       </div>

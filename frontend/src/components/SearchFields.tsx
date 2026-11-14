@@ -52,7 +52,7 @@ function SearchFields() {
       showAlert(t("SearchFields.playlistTitle"), t("SearchFields.playlistMessage"), playlistKey);
       return;
     }
-    if (resource !== "track" && !isYouTubeUrl && !localStorage.getItem(trackKey)) {
+    if (resource === null && !isYouTubeUrl && !localStorage.getItem(trackKey)) {
       showAlert(t("SearchFields.impreciseTitle"), t("SearchFields.impreciseMessage"), trackKey);
       return;
     }
@@ -69,7 +69,8 @@ function SearchFields() {
       output_format: outputFormat,
     });
     if (success) {
-      setQuery("");
+      // Keep whatever the user typed while the request was on its way.
+      setQuery((current) => (current.trim() === searchQuery ? "" : current));
     }
     setIsSubmitting(false);
   };

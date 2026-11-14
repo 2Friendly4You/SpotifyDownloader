@@ -22,6 +22,9 @@ def download_counter():
 @status_bp.route('/api/status/<unique_id>', methods=['GET'])
 def check_request(unique_id):
     file_path = os.path.join(MUSIC_DIR, unique_id + ".zip")
+    if download_state.is_cancelled(unique_id):
+        # The worker may still be winding down, but for the user the job is gone.
+        return jsonify({'status': 'not_found', 'message': 'Request not found or expired.'}), 404
     kind, extra = download_state.lookup(unique_id)
 
     if kind == 'queued':
