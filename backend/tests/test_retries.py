@@ -138,8 +138,9 @@ def test_retries_report_their_own_progress(_quiet):
     downloads.download_with_retries(downloader, [FakeSong("a"), FakeSong("b")], "youtube-music", progress)
     retrying = [data for name, data in _quiet if name == "download_progress" and data["message"] == "Retrying"]
     assert retrying
-    assert retrying[0]["songs_done"] == 0
-    assert retrying[0]["songs_total"] == 1
+    # The counter covers the whole job: one of two songs saved so far.
+    assert retrying[0]["songs_total"] == 2
+    assert retrying[0]["songs_done"] in (0, 1)
     download_state.release("job")
 
 

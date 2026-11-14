@@ -72,6 +72,11 @@ class SpotdlProgress:
     While songs are being looked up there is no estimate: the card says the
     time is still being calculated. Each download round (the first one and
     every retry) gets its own throughput-based estimate.
+
+    The song counter is "saved songs of the whole job". Failed songs do not
+    count, and a retry round adds to what earlier rounds saved. Counting
+    failures as done and restarting the counter per round made it jump
+    backwards, from "1/1" to "0/1", whenever a song was retried.
     """
 
     def __init__(self, unique_id, clock=time.monotonic, workers=4):
@@ -80,6 +85,7 @@ class SpotdlProgress:
         self._clock = clock
         self._workers = workers
         self._retry_total = 0
+        self._saved_before = 0
         self._eta = None
         self._songs = SongProgress(0)
 
@@ -100,6 +106,7 @@ class SpotdlProgress:
         self.total = total
         self._eta = ThroughputEta(total, workers=self._workers, clock=self._clock)
         self._songs = SongProgress(total)
+        self._saved_before = 0
         history.set_songs(self.unique_id, total)
         report_progress(self.unique_id, SEARCH_DONE_PERCENT, 'Downloading', force=True, details={
             'songs_done': 0,
@@ -112,8 +119,8 @@ class SpotdlProgress:
         batch = self._retry_total or self.total
         left = self._eta.update(done, fraction * batch)
         details = {
-            'songs_done': done,
-            'songs_total': batch,
+            'songs_done': self._saved_total(),
+            'songs_total': self.total,
             'songs_running': running,
             'eta_seconds': round_eta(left),
         }
@@ -123,14 +130,18 @@ class SpotdlProgress:
         percent = SEARCH_DONE_PERCENT + (DOWNLOAD_DONE_PERCENT - SEARCH_DONE_PERCENT) * fraction
         report_progress(self.unique_id, percent, 'Downloading', details=details)
 
+    def _saved_total(self):
+        return min(self._saved_before + self._songs.saved, self.total)
+
     def retrying(self, count):
-        """A retry round for ``count`` failed songs starts. The bar stays where it is."""
+        """A retry round for ``count`` failed songs starts. The bar and the counter stay."""
+        self._saved_before = self._saved_total()
         self._retry_total = count
         self._eta = ThroughputEta(count, workers=self._workers, clock=self._clock)
         self._songs = SongProgress(count)
         report_progress(self.unique_id, None, 'Retrying', force=True, details={
-            'songs_done': 0,
-            'songs_total': count,
+            'songs_done': self._saved_before,
+            'songs_total': self.total,
         })
 
 

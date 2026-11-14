@@ -91,11 +91,11 @@
         "questions": [
             {
                 "q": "How do I download songs?",
-                "a": "Enter a song title or a direct Spotify URL into the search bar. Select your preferred audio provider, lyrics provider (optional), and output format. Then, click the 'Search' button. Once the results appear, click the 'Download' button next to the desired track or besides the playlist/album art."
+                "a": "Enter a song title or a Spotify URL into the search bar. Select your preferred audio provider, a lyrics provider (optional) and the output format, then click 'Search'. A card with the progress appears under 'Requests'. When it is done, click 'Download' on the card to get a ZIP file."
             },
             {
                 "q": "How do I download playlists or albums?",
-                "a": "You can download playlists or albums by entering their Spotify URL into the search bar. The playlist/album must be public or accessible. After searching, a download button for the entire playlist/album will appear. Note that downloading large playlists can take a significant amount of time."
+                "a": "Enter the Spotify URL of the playlist or album into the search bar. The playlist/album must be public. Once all songs are downloaded, the 'Download' button on its card saves the whole playlist/album as one ZIP file. Large playlists can take a while."
             },
             {
                 "q": "What are Audio Providers?",
@@ -115,7 +115,7 @@
             },
             {
                 "q": "What happens if a song cannot be downloaded?",
-                "a": "If a song cannot be found or downloaded from the selected Audio Provider, you will receive a notification in the UI. This could be due to unavailability on the provider or other issues. Try using a different Audio Provider or checking the song's availability directly on the source platform."
+                "a": "If a song cannot be found or downloaded from the selected audio provider, the server automatically tries again, also with other providers. If it still fails, the card shows which songs are missing and why. You can then try again with a different audio provider."
             },
             {
                 "q": "Why is my download showing as 'queued'?",

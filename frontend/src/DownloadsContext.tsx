@@ -5,6 +5,7 @@ import { useNotification } from "./components/Notification";
 import i18n from "./i18n";
 import { normalizeQuery, requestName } from "./requestName";
 import type { DownloadRequest, FailedTrack, RequestStatus, SearchPayload } from "./components/Types";
+import { serverMessage } from "./serverMessages";
 
 const STORAGE_KEY = "userDownloads";
 
@@ -324,7 +325,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
         notify(
           "error",
           i18n.t("Toasts.downloadFailedTitle"),
-          `${data.title || data.search_query || ""}: ${data.message || ""}`
+          `${data.title || data.search_query || ""}: ${serverMessage(data.message || "", i18n.language)}`
         );
       }
     );
@@ -371,7 +372,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
         return true;
       }
 
-      notify("error", i18n.t("Toasts.searchErrorTitle"), result.data.message || i18n.t("Toasts.searchErrorMessage"));
+      notify("error", i18n.t("Toasts.searchErrorTitle"), serverMessage(result.data.message || "", i18n.language) || i18n.t("Toasts.searchErrorMessage"));
       return false;
     } catch {
       notify("error", i18n.t("Toasts.errorTitle"), i18n.t("Toasts.networkMessage"));

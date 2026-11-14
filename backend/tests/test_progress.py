@@ -333,3 +333,49 @@ def test_a_large_batch_still_waits_for_real_data():
     eta = ThroughputEta(20, workers=4, clock=clock)
     clock.now += 5
     assert eta.update(0, 3.5) is None
+
+
+def _counts(emitted):
+    return [(data["message"], data["songs_done"], data["songs_total"]) for _, data in emitted if "songs_done" in data
+            and data["message"] in ("Downloading", "Retrying")]
+
+
+def test_a_retried_song_never_moves_the_counter_backwards(emitted, monkeypatch):
+    # Live: "Erneuter Versuch 1/1" then "0/1" when the next round started,
+    # because a failed song counted as done and every round restarted at 0.
+    clock = FakeClock()
+    monkeypatch.setattr("app.state.time.monotonic", clock)
+    progress = downloads.SpotdlProgress("job", clock=clock)
+    progress.downloading(1)
+    for _round in range(3):
+        clock.now += 1
+        progress.song_update("song", 40, "Downloading")
+        clock.now += 1
+        progress.song_update("song", 40, "Error")
+        progress.retrying(1)
+    clock.now += 1
+    progress.song_update("song", 100, "Done")
+    done = [count for _, count, _ in _counts(emitted)]
+    assert done == sorted(done)
+    assert _counts(emitted)[-1] == ("Retrying", 1, 1)
+    assert {total for _, _, total in _counts(emitted)} == {1}
+
+
+def test_a_playlist_retry_continues_from_the_saved_songs(emitted, monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr("app.state.time.monotonic", clock)
+    progress = downloads.SpotdlProgress("job", clock=clock)
+    progress.downloading(5)
+    for key in "abcd":
+        clock.now += 1
+        progress.song_update(key, 100, "Done")
+    clock.now += 1
+    progress.song_update("e", 30, "Error")
+    assert emitted[-1][1]["songs_done"] == 4  # the failed song is not "done"
+    progress.retrying(1)
+    assert (emitted[-1][1]["songs_done"], emitted[-1][1]["songs_total"]) == (4, 5)
+    clock.now += 1
+    progress.song_update("e2", 100, "Done")
+    assert (emitted[-1][1]["songs_done"], emitted[-1][1]["songs_total"]) == (5, 5)
+    done = [count for _, count, _ in _counts(emitted)]
+    assert done == sorted(done)
