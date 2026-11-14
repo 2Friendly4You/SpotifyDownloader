@@ -4,6 +4,7 @@ import styles from "./RequestList.module.css";
 import { RequestComponent } from "./RequestComponent";
 import Alert, { useAlert } from "./Alert";
 import { useDownloads } from "../DownloadsContext";
+import { requestName } from "../requestName";
 
 function Requests() {
   const { t } = useTranslation();
@@ -24,7 +25,7 @@ function Requests() {
     setCancellingActive(active);
     showAlert(
       t(active ? "Alert.cancelRequest" : "Alert.deleteRequest"),
-      t(active ? "Alert.cancelRequestMessage" : "Alert.deleteRequestMessage", { title: request?.searchQuery }),
+      t(active ? "Alert.cancelRequestMessage" : "Alert.deleteRequestMessage", { title: request ? requestName(request) : "" }),
       uniqueId
     );
   };
@@ -47,7 +48,7 @@ function Requests() {
       </button>
       <ul>
         {requests.map((request) => (
-          <li key={request.unique_id}>
+          <li key={request.unique_id} id={`request-${request.unique_id}`}>
             <RequestComponent
               request={request}
               handleClose={() => handleCloseRequest(request.unique_id)}

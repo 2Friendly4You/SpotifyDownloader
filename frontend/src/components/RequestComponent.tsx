@@ -1,8 +1,26 @@
+import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import styles from "./RequestComponent.module.css";
 import type { DownloadRequest } from "./Types";
 import { useDownloads } from "../DownloadsContext";
 import { roughEta } from "../eta";
+import { requestName } from "../requestName";
+
+const ETA_TICK_MS = 5000;
+
+// Re-render every few seconds while active, so the time left counts down
+// between server updates instead of standing still.
+function useNow(active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => setNow(Date.now()), ETA_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  return now;
+}
 
 function RequestComponent({
   request,
@@ -35,10 +53,20 @@ function RequestComponent({
       ? t("RequestComponent.running", { count: request.songsRunning })
       : "";
   const stageLabel = songCount ? `${progressLabel} ${songCount}` : progressLabel;
-  const eta = roughEta(request.etaSeconds);
+  const now = useNow(request.status === "pending");
+  const secondsLeft =
+    request.etaSeconds == null
+      ? null
+      : Math.max(0, request.etaSeconds - (request.etaReceivedAt ? (now - request.etaReceivedAt) / 1000 : 0));
+  const eta = roughEta(secondsLeft);
+  // Before the server has measured anything it sends no estimate; say so
+  // instead of guessing "under a minute".
+  const estimating = request.status === "pending" && (searching || downloading || retrying);
   const etaLabel = eta
     ? t(`RequestComponent.eta.${eta.key}`, { value: eta.value.toLocaleString(i18n.language) })
-    : "";
+    : estimating
+      ? t("RequestComponent.eta.calculating")
+      : "";
   const secondaryLabel = [runningLabel, etaLabel].filter(Boolean).join(" · ");
 
   const failedTracks =
@@ -50,10 +78,29 @@ function RequestComponent({
   const closeLabel = t(cancellable ? "RequestComponent.cancelAndDelete" : "RequestComponent.remove");
   const showActions = request.status === "completed" || request.status === "failed";
 
+  const name = requestName(request);
+  const isLink = /^https?:\/\//i.test(request.searchQuery.trim());
+  // The link stays visible under the name, so two playlists with the same
+  // name can still be told apart.
+  const sourceLine = request.title
+    ? request.title !== request.searchQuery
+      ? request.searchQuery
+      : ""
+    : isLink && cancellable
+      ? t("RequestComponent.resolvingName")
+      : "";
+
   return (
     <div className={`${styles.root} ${styles[request.status] || ""}`}>
       <div className={styles.header}>
-        <h2 title={request.searchQuery}>{request.searchQuery}</h2>
+        <div className={styles.titleBlock}>
+          <h2 title={name}>{name}</h2>
+          {sourceLine && (
+            <p className={styles.source} title={request.title ? request.searchQuery : undefined}>
+              {sourceLine}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           className={styles.closeButton}

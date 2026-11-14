@@ -17,7 +17,7 @@ from app import cancellation
 from app.cancellation import JobCancelled
 from app.config import MUSIC_DIR
 from app.extensions import socketio
-from app.progress import EtaEstimator, SongProgress, round_eta, song_rate
+from app.progress import EtaEstimator, SongProgress, ThroughputEta, round_eta
 from app.retries import (
     FAILED_TRACKS_FILE,
     MAX_FAILED_TRACKS,
@@ -30,6 +30,7 @@ from app.retries import (
     use_provider,
 )
 from app.state import PROGRESS_DETAIL_KEYS, download_state
+from app.titles import clean_title, title_from_songs, write_zip_title
 
 _spotify_init_lock = threading.Lock()
 
@@ -38,6 +39,7 @@ _spotify_init_lock = threading.Lock()
 # song's metadata, 5-95 % for the downloads and the rest for packaging.
 SEARCH_LIST_PERCENT = 1.0
 SEARCH_DONE_PERCENT = 5.0
+SPOTDL_THREADS = 4
 DOWNLOAD_DONE_PERCENT = 95.0
 
 
@@ -65,17 +67,20 @@ def report_progress(unique_id, percent, message, force=False, details=None):
 
 
 class SpotdlProgress:
-    """Turn spotDL's search and download phases into one progress bar with an ETA."""
+    """Turn spotDL's search and download phases into one progress bar with an ETA.
 
-    def __init__(self, unique_id, clock=time.monotonic):
+    While songs are being looked up there is no estimate: the card says the
+    time is still being calculated. Each download round (the first one and
+    every retry) gets its own throughput-based estimate.
+    """
+
+    def __init__(self, unique_id, clock=time.monotonic, workers=4):
         self.unique_id = unique_id
         self.total = 0
         self._clock = clock
-        self._search_eta = None
-        self._download_eta = None
-        self._download_started = None
+        self._workers = workers
         self._retry_total = 0
-        self._retry_eta = None
+        self._eta = None
         self._songs = SongProgress(0)
 
     def searching(self):
@@ -84,67 +89,47 @@ class SpotdlProgress:
     def resolved(self, done, total):
         """``done`` of ``total`` songs have their metadata."""
         self.total = total
-        if self._search_eta is None:
-            self._search_eta = EtaEstimator(min_elapsed=2.0, min_fraction=0.0, clock=self._clock)
         fraction = done / total if total else 1.0
-        search_left = self._search_eta.update(fraction) if done else None
-        eta = song_rate.estimate(total) + (search_left or 0.0)
         percent = SEARCH_LIST_PERCENT + (SEARCH_DONE_PERCENT - SEARCH_LIST_PERCENT) * fraction
         report_progress(self.unique_id, percent, 'Searching', details={
             'songs_done': done,
             'songs_total': total,
-            'eta_seconds': round_eta(eta),
         })
 
     def downloading(self, total):
         self.total = total
-        self._download_started = self._clock()
-        self._download_eta = EtaEstimator(clock=self._clock)
+        self._eta = ThroughputEta(total, workers=self._workers, clock=self._clock)
         self._songs = SongProgress(total)
         report_progress(self.unique_id, SEARCH_DONE_PERCENT, 'Downloading', force=True, details={
             'songs_done': 0,
             'songs_total': total,
-            'eta_seconds': round_eta(song_rate.estimate(total)),
         })
 
     def song_update(self, key, percent, message):
         """One song changed. The card shows the aggregate, not the song's own step."""
         done, running, fraction = self._songs.update(key, percent, message)
-        if self._retry_total:
-            left = self._retry_eta.update(fraction)
-            if left is None:
-                left = song_rate.estimate(self._retry_total) * (1.0 - fraction)
-            report_progress(self.unique_id, None, 'Retrying', details={
-                'songs_done': done,
-                'songs_total': self._retry_total,
-                'songs_running': running,
-                'eta_seconds': round_eta(left),
-            })
-            return
-        left = self._download_eta.update(fraction)
-        if left is None:
-            left = song_rate.estimate(self.total) * (1.0 - fraction)
-        percent = SEARCH_DONE_PERCENT + (DOWNLOAD_DONE_PERCENT - SEARCH_DONE_PERCENT) * fraction
-        report_progress(self.unique_id, percent, 'Downloading', details={
+        batch = self._retry_total or self.total
+        left = self._eta.update(done, fraction * batch)
+        details = {
             'songs_done': done,
-            'songs_total': self.total,
+            'songs_total': batch,
             'songs_running': running,
             'eta_seconds': round_eta(left),
-        })
-
-    def downloads_finished(self):
-        if self._download_started is not None:
-            song_rate.record(self._clock() - self._download_started, self.total)
+        }
+        if self._retry_total:
+            report_progress(self.unique_id, None, 'Retrying', details=details)
+            return
+        percent = SEARCH_DONE_PERCENT + (DOWNLOAD_DONE_PERCENT - SEARCH_DONE_PERCENT) * fraction
+        report_progress(self.unique_id, percent, 'Downloading', details=details)
 
     def retrying(self, count):
         """A retry round for ``count`` failed songs starts. The bar stays where it is."""
         self._retry_total = count
-        self._retry_eta = EtaEstimator(clock=self._clock)
+        self._eta = ThroughputEta(count, workers=self._workers, clock=self._clock)
         self._songs = SongProgress(count)
         report_progress(self.unique_id, None, 'Retrying', force=True, details={
             'songs_done': 0,
             'songs_total': count,
-            'eta_seconds': round_eta(song_rate.estimate(count)),
         })
 
 
@@ -179,7 +164,21 @@ def attach_spotdl_progress(downloader, progress):
     )
 
 
-def search_songs(downloader, search_query, on_resolved, is_cancelled=None):
+def publish_title(unique_id, title):
+    """Tell the card what this job is called once the name is known."""
+    title = clean_title(title)
+    if not title or title == download_state.title(unique_id):
+        return
+    download_state.set_title(unique_id, title)
+    socketio.emit('download_title', {'unique_id': unique_id, 'title': title}, namespace='/')
+
+
+def job_download_url(unique_id):
+    """Served by the app so the zip gets a readable file name (the file stays <uuid>.zip)."""
+    return f'/api/download/{unique_id}'
+
+
+def search_songs(downloader, search_query, on_resolved, is_cancelled=None, on_title=None):
     """spotDL's parse_query, reporting each song whose metadata is resolved.
 
     Mirrors spotdl.utils.search.parse_query (spotDL 4.6.0) so the search
@@ -193,6 +192,8 @@ def search_songs(downloader, search_query, on_resolved, is_cancelled=None):
         album_type=settings["album_type"],
         playlist_retain_track_cover=settings["playlist_retain_track_cover"],
     )
+    if on_title is not None:
+        on_title(title_from_songs(search_query, simple_songs))
     total = len(simple_songs)
     if total:
         on_resolved(0, total)
@@ -232,7 +233,6 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
     errors_before = len(downloader.errors)
     results = downloader.download_multiple_songs(songs)
     check_cancelled(progress.unique_id)
-    progress.downloads_finished()
 
     succeeded = [(song, path) for song, path in results if path]
     failed = [song for song, path in results if not path]
@@ -293,6 +293,9 @@ def mark_failed(unique_id, search_query, message, failed_tracks=None):
         'message': message,
         'zip_url': None,
     }
+    title = download_state.title(unique_id)
+    if title:
+        payload['title'] = title
     if failed_tracks:
         payload['failed_tracks'] = failed_tracks
     download_state.mark_failed(unique_id, message, failed_tracks)
@@ -306,6 +309,9 @@ def notify_client_download_complete(unique_id, download_url, failed_tracks=None)
         'unique_id': unique_id,
         'url': download_url
     }
+    title = download_state.title(unique_id)
+    if title:
+        payload['title'] = title
     if failed_tracks:
         payload['failed_tracks'] = failed_tracks
     socketio.emit('download_complete', payload, namespace='/')
@@ -334,7 +340,8 @@ def publish_zip(unique_id, search_query, download_folder, failed_tracks=None):
         os.remove(zip_path)
         return
 
-    notify_client_download_complete(unique_id, f'/music/{unique_id}.zip', failed_tracks)
+    write_zip_title(zip_path, download_state.title(unique_id))
+    notify_client_download_complete(unique_id, job_download_url(unique_id), failed_tracks)
 
 
 def ensure_spotify_client():
@@ -354,8 +361,11 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
     download_folder = os.path.join(MUSIC_DIR, unique_id)
     os.makedirs(download_folder, exist_ok=True)
     downloader = None
-    progress = SpotdlProgress(unique_id)
+    progress = SpotdlProgress(unique_id, workers=SPOTDL_THREADS)
     progress.searching()
+    # Free-text searches are named after the query right away; links get
+    # their playlist, album or song name once spotDL has looked them up.
+    publish_title(unique_id, title_from_songs(search_query, []))
 
     try:
         ensure_spotify_client()
@@ -364,14 +374,15 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             "lyrics_providers": [lyrics_format] if lyrics_format else [],
             "format": output_format,
             "output": os.path.join(download_folder, "{artists} - {title}.{output-ext}"),
-            "threads": 4,
+            "threads": SPOTDL_THREADS,
             "bitrate": "auto",
             "simple_tui": True,
         })
         cancellation.register(unique_id, cancellation.loop_stopper(downloader.loop))
         check_cancelled(unique_id)
         songs, failed_tracks = search_songs(
-            downloader, search_query, progress.resolved, lambda: download_state.is_cancelled(unique_id)
+            downloader, search_query, progress.resolved, lambda: download_state.is_cancelled(unique_id),
+            on_title=lambda title: publish_title(unique_id, title),
         )
         if not songs:
             mark_failed(
@@ -479,6 +490,8 @@ def download_from_youtube(unique_id, url, output_format):
 
 def youtube_progress_hook(unique_id, data, eta=None):
     check_cancelled(unique_id)
+    info = data.get('info_dict') or {}
+    publish_title(unique_id, info.get('playlist_title') or info.get('title'))
     status = data.get('status')
     if status == 'downloading':
         percent = youtube_download_percent(data)

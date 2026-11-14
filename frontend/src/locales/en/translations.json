@@ -33,7 +33,8 @@
         "eta": {
             "underMinute": "< 1 min left",
             "minutes": "About {{value}} min left",
-            "hours": "About {{value}} h left"
+            "hours": "About {{value}} h left",
+            "calculating": "Calculating time left…"
         },
         "failedTracks": {
             "summary_one": "{{count}} song failed",
@@ -63,7 +64,8 @@
             "Skipped": "Skipped",
             "Error": "Error",
             "Retrying": "Retrying"
-        }
+        },
+        "resolvingName": "Looking up the name…"
     },
     "Alert": {
         "ok": "OK",
@@ -200,5 +202,15 @@
         "errorLogTitle": "Error log",
         "errorLogMessage": "Downloading the error log for \"{{query}}\".",
         "fileGoneMessage": "Failed to start the download. The file is probably no longer available."
+    },
+    "Duplicate": {
+        "runningTitle": "This download is already running",
+        "finishedTitle": "This download is already finished",
+        "runningMessage": "\"{{name}}\" is already downloading or waiting in the queue.",
+        "finishedMessage": "\"{{name}}\" was downloaded recently and is still in your list.",
+        "showRunning": "Show running download",
+        "showFinished": "Show finished download",
+        "restart": "Start again anyway",
+        "back": "Back"
     }
 }

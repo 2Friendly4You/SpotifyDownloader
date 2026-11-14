@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useDownloads } from "../DownloadsContext";
 import { spotifyResource } from "../spotifyUrl";
+import { findDuplicate, requestName } from "../requestName";
+import type { DownloadRequest } from "./Types";
 import { useNotification } from "./Notification";
 import Alert, { useAlert } from "./Alert";
 import styles from "./SearchFields.module.css";
@@ -27,7 +29,7 @@ const YOUTUBE_REGEX = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
 
 function SearchFields() {
   const { t } = useTranslation();
-  const { submitSearch } = useDownloads();
+  const { submitSearch, requests } = useDownloads();
   const { notify } = useNotification();
   const { alertState, showAlert, hideAlert, confirmAction } = useAlert();
   const [query, setQuery] = useState("");
@@ -35,13 +37,20 @@ function SearchFields() {
   const [lyricsFormat, setLyricsFormat] = useState("musixmatch");
   const [outputFormat, setOutputFormat] = useState("mp3");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicate, setDuplicate] = useState<DownloadRequest | null>(null);
 
   const isYouTubeUrl = useMemo(() => YOUTUBE_REGEX.test(query.trim()), [query]);
 
-  const startDownload = async () => {
+  const startDownload = async (allowDuplicate = false) => {
     const searchQuery = query.trim();
     if (!searchQuery || !outputFormat) {
       notify("error", t("SearchFields.missingTitle"), t("SearchFields.missingMessage"));
+      return;
+    }
+
+    const existing = allowDuplicate ? undefined : findDuplicate(requests, searchQuery);
+    if (existing) {
+      setDuplicate(existing);
       return;
     }
 
@@ -74,6 +83,34 @@ function SearchFields() {
     }
     setIsSubmitting(false);
   };
+
+  const jumpToExisting = () => {
+    const existing = duplicate;
+    setDuplicate(null);
+    if (!existing) {
+      return;
+    }
+    setQuery("");
+    const card = document.getElementById(`request-${existing.unique_id}`);
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.animate(
+        [
+          { boxShadow: "0 0 0 0 transparent" },
+          { boxShadow: "0 0 0 4px var(--primary)" },
+          { boxShadow: "0 0 0 0 transparent" },
+        ],
+        { duration: 1800, easing: "ease-in-out" }
+      );
+    }
+  };
+
+  const restartAnyway = () => {
+    setDuplicate(null);
+    void startDownload(true);
+  };
+
+  const duplicateActive = duplicate?.status === "pending" || duplicate?.status === "queued";
 
   const handleConfirm = () => {
     confirmAction(async () => {
@@ -173,6 +210,19 @@ function SearchFields() {
         message={alertState.message}
         onConfirm={handleConfirm}
         onCancel={hideAlert}
+      />
+      <Alert
+        isOpen={duplicate !== null}
+        title={t(duplicateActive ? "Duplicate.runningTitle" : "Duplicate.finishedTitle")}
+        message={t(duplicateActive ? "Duplicate.runningMessage" : "Duplicate.finishedMessage", {
+          name: duplicate ? requestName(duplicate) : "",
+        })}
+        onConfirm={restartAnyway}
+        confirmLabel={t("Duplicate.restart")}
+        onExtra={jumpToExisting}
+        extraLabel={t(duplicateActive ? "Duplicate.showRunning" : "Duplicate.showFinished")}
+        onCancel={() => setDuplicate(null)}
+        cancelLabel={t("Duplicate.back")}
       />
     </div>
   );

@@ -26,6 +26,7 @@ class DownloadState:
         self._failed = {}
         self._completed = {}
         self._failed_tracks = {}
+        self._titles = {}
         # Cancelled job ids stay here for a while after the job released its
         # slot, so yt-dlp threads that are still finishing a request stop at
         # their next progress hook instead of downloading to the end.
@@ -93,9 +94,22 @@ class DownloadState:
         with self._lock:
             return unique_id in self._cancelled
 
+    def set_title(self, unique_id, title):
+        with self._lock:
+            if title:
+                self._titles[unique_id] = title
+            else:
+                self._titles.pop(unique_id, None)
+
+    def title(self, unique_id):
+        """Display name of a job (playlist, album or song), or None while unknown."""
+        with self._lock:
+            return self._titles.get(unique_id)
+
     def forget(self, unique_id):
         """Drop every trace of a finished job, e.g. after it was cancelled late."""
         with self._lock:
+            self._titles.pop(unique_id, None)
             self._failed.pop(unique_id, None)
             self._completed.pop(unique_id, None)
             self._failed_tracks.pop(unique_id, None)
@@ -239,6 +253,11 @@ class DownloadState:
             self._failed_tracks = {
                 key: tracks for key, tracks in self._failed_tracks.items()
                 if key in self._failed or key in self._completed
+            }
+            queued = {job['unique_id'] for job in self._queue}
+            self._titles = {
+                key: title for key, title in self._titles.items()
+                if key in self._pending or key in queued or key in self._failed or key in self._completed
             }
             return timed_out, self._promote_locked()
 

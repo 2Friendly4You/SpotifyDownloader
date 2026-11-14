@@ -190,7 +190,7 @@ def test_existing_zip_is_ready_to_download(client):
 
     status = client.get("/api/status/ready")
     assert status.status_code == 200
-    assert status.get_json() == {"status": "completed", "url": "/music/ready.zip"}
+    assert status.get_json() == {"status": "completed", "url": "/api/download/ready"}
 
     download = client.get("/music/ready.zip")
     assert download.status_code == 200

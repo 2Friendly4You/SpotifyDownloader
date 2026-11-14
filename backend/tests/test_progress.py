@@ -1,7 +1,7 @@
 import pytest
 
 from app import downloads
-from app.progress import EtaEstimator, SongProgress, SongRate, round_eta
+from app.progress import EtaEstimator, SongProgress, ThroughputEta, round_eta
 from app.state import DownloadState, download_state
 
 
@@ -50,13 +50,67 @@ def test_eta_is_zero_when_the_phase_is_done():
     assert eta.update(1.0) == 0.0
 
 
-def test_song_rate_learns_from_finished_downloads():
-    rate = SongRate(default=10, alpha=0.5)
-    assert rate.estimate(3) == 30
-    rate.record(seconds=40, songs=10)
-    assert rate.estimate(1) == pytest.approx(7.0)
-    rate.record(seconds=0, songs=0)
-    assert rate.estimate(1) == pytest.approx(7.0)
+def test_throughput_eta_waits_for_real_data():
+    clock = FakeClock()
+    eta = ThroughputEta(20, workers=4, min_elapsed=20, clock=clock)
+    clock.now += 5
+    # Four songs are 40 % in after 5 s: far too early to promise anything.
+    assert eta.update(0, 1.6) is None
+    clock.now += 10
+    assert eta.update(0, 2.0) is None
+    clock.now += 10
+    # 25 s without a finished song is enough to start estimating.
+    assert eta.update(0, 2.4) == pytest.approx((20 - 2.4) / (2.4 / 25))
+
+
+def test_throughput_eta_uses_parallel_throughput_and_counts_down():
+    clock = FakeClock()
+    eta = ThroughputEta(40, workers=4, clock=clock)
+    # Every song takes 20 s and four run at once: 0.2 songs per second.
+    clock.now += 20
+    first = eta.update(4, 4.0)
+    assert first == pytest.approx(36 / 0.2)
+    estimates = [first]
+    for step in range(2, 9):
+        clock.now += 20
+        estimates.append(eta.update(4 * step, 4.0 * step))
+    actual = [(40 - 4 * step) / 0.2 for step in range(1, 9)]
+    assert estimates == pytest.approx(actual, abs=1)
+
+
+def test_throughput_eta_is_steady_when_songs_finish_in_bursts():
+    clock = FakeClock()
+    eta = ThroughputEta(40, workers=4, clock=clock)
+    clock.now += 20
+    eta.update(4, 4.0)
+    clock.now += 20
+    before = eta.update(8, 8.0)
+    assert before == pytest.approx(32 / 0.2, abs=1)
+    # Four more songs land one second later, a misleadingly high rate.
+    clock.now += 1
+    after = eta.update(12, 12.0)
+    assert before * 0.9 < after < before
+
+
+def test_first_estimate_settles_over_the_whole_first_burst():
+    clock = FakeClock()
+    eta = ThroughputEta(10, workers=4, clock=clock)
+    clock.now += 30
+    assert eta.update(1, 1.0) == pytest.approx(9 * 30)
+    for done in (2, 3, 4):
+        clock.now += 0.01
+        last = eta.update(done, float(done))
+    assert last == pytest.approx(6 * 30 / 4, rel=0.01)
+
+def test_throughput_eta_for_the_last_songs_is_one_song_duration():
+    clock = FakeClock()
+    eta = ThroughputEta(6, workers=4, clock=clock)
+    clock.now += 20
+    eta.update(4, 4.0)  # 0.2 songs/s, so one song takes 20 s with four workers
+    clock.now += 0.001
+    # Two songs left, both just started: about 20 s, not remaining / rate = 10 s.
+    assert eta.update(4, 4.0) == pytest.approx(20, abs=0.5)
+    assert eta.update(6, 6.0) == 0.0
 
 
 def test_round_eta():
@@ -161,10 +215,9 @@ def test_search_reports_each_resolved_song(monkeypatch):
 
 
 def test_spotdl_progress_moves_through_the_phases(emitted, monkeypatch):
-    monkeypatch.setattr(downloads, "song_rate", SongRate(default=5))
     clock = FakeClock()
     monkeypatch.setattr("app.state.time.monotonic", clock)
-    progress = downloads.SpotdlProgress("job", clock=clock)
+    progress = downloads.SpotdlProgress("job", clock=clock, workers=4)
 
     progress.searching()
     assert emitted[-1][1] == {"unique_id": "job", "progress": 1.0, "message": "Searching"}
@@ -172,7 +225,8 @@ def test_spotdl_progress_moves_through_the_phases(emitted, monkeypatch):
     clock.now += 1
     progress.resolved(0, 10)
     assert emitted[-1][1]["songs_total"] == 10
-    assert emitted[-1][1]["eta_seconds"] == 50
+    # No guess while songs are still being looked up.
+    assert "eta_seconds" not in emitted[-1][1]
 
     clock.now += 4
     progress.resolved(10, 10)
@@ -183,19 +237,20 @@ def test_spotdl_progress_moves_through_the_phases(emitted, monkeypatch):
     clock.now += 1
     progress.downloading(10)
     assert emitted[-1][1]["message"] == "Downloading"
-    assert emitted[-1][1]["eta_seconds"] == 50
+    assert "eta_seconds" not in emitted[-1][1]
 
-    clock.now += 1
+    clock.now += 5
+    progress.song_update(0, 40, "Downloading")
+    assert "eta_seconds" not in emitted[-1][1]
+
+    clock.now += 25
     for song in range(4):
         progress.song_update(song, 100, "Done")
-    clock.now += 29
-    progress.song_update(4, 100, "Done")
     last = emitted[-1][1]
-    assert last["progress"] == 50.0
-    assert last["eta_seconds"] == 30
-    assert last["songs_done"] == 5
-    assert last["songs_total"] == 10
-
+    assert last["progress"] == 41.0
+    assert last["songs_done"] == 4
+    # 4 songs in 30 s with 4 workers: 6 songs left take about 45 s.
+    assert 40 <= last["eta_seconds"] <= 50
 
 def test_youtube_hook_adds_an_eta_once_it_has_data(emitted, monkeypatch):
     clock = FakeClock()

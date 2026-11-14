@@ -33,7 +33,8 @@
         "eta": {
             "underMinute": "Noch < 1 Min.",
             "minutes": "Noch ca. {{value}} Min.",
-            "hours": "Noch ca. {{value}} Std."
+            "hours": "Noch ca. {{value}} Std.",
+            "calculating": "Restzeit wird berechnet…"
         },
         "failedTracks": {
             "summary_one": "{{count}} Song fehlerhaft",
@@ -63,7 +64,8 @@
             "Skipped": "Übersprungen",
             "Error": "Fehler",
             "Retrying": "Erneuter Versuch"
-        }
+        },
+        "resolvingName": "Name wird ermittelt…"
     },
     "Alert": {
         "ok": "OK",
@@ -200,5 +202,15 @@
         "errorLogTitle": "Fehlerprotokoll",
         "errorLogMessage": "Das Fehlerprotokoll für \"{{query}}\" wird heruntergeladen.",
         "fileGoneMessage": "Der Download konnte nicht gestartet werden. Die Datei ist vermutlich nicht mehr verfügbar."
+    },
+    "Duplicate": {
+        "runningTitle": "Dieser Download läuft bereits",
+        "finishedTitle": "Dieser Download ist schon fertig",
+        "runningMessage": "\"{{name}}\" wird gerade heruntergeladen oder wartet in der Warteschlange.",
+        "finishedMessage": "\"{{name}}\" wurde vor Kurzem schon heruntergeladen und steht noch in Ihrer Liste.",
+        "showRunning": "Laufenden Download zeigen",
+        "showFinished": "Fertigen Download zeigen",
+        "restart": "Trotzdem neu starten",
+        "back": "Zurück"
     }
 }

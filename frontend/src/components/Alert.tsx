@@ -18,9 +18,23 @@ type AlertProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  // Optional third choice between "back" and the main action.
+  extraLabel?: string;
+  onExtra?: () => void;
 };
 
-function Alert({ isOpen, title, message, onConfirm, onCancel, confirmLabel, cancelLabel, danger }: AlertProps) {
+function Alert({
+  isOpen,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmLabel,
+  cancelLabel,
+  danger,
+  extraLabel,
+  onExtra,
+}: AlertProps) {
   useEffect(() => {
     if (isOpen) {
       // Store the element that had focus before the alert opened
@@ -90,10 +104,15 @@ function Alert({ isOpen, title, message, onConfirm, onCancel, confirmLabel, canc
       <div className={styles.alert} role="alertdialog" aria-modal="true" aria-labelledby="alert-title" aria-describedby="alert-message">
         <h3 id="alert-title">{title}</h3>
         <p id="alert-message">{message}</p>
-        <div className={styles.buttonContainer}>
+        <div className={`${styles.buttonContainer} ${extraLabel ? styles.stacked : ""}`}>
           <button onClick={onCancel} className={styles.cancelButton}>
             {cancelLabel ?? <Trans i18nKey="Alert.cancel">Cancel</Trans>}
           </button>
+          {extraLabel && onExtra && (
+            <button onClick={onExtra} className={styles.cancelButton}>
+              {extraLabel}
+            </button>
+          )}
           <button onClick={onConfirm} className={`${styles.confirmButton} ${danger ? styles.danger : ""}`}>
             {confirmLabel ?? <Trans i18nKey="Alert.ok">OK</Trans>}
           </button>
