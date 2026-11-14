@@ -11,8 +11,10 @@ import logging
 import os
 import threading
 import time
+import zipfile
 
-from app.config import SEARCHES_FILE
+from app.config import MUSIC_DIR, SEARCHES_FILE
+from app.titles import is_job_id, read_zip_title
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +41,52 @@ def _load_locked():
         with open(path, 'r', encoding='utf-8') as handle:
             data = json.load(handle)
     except FileNotFoundError:
-        return
+        data = []
     except Exception as e:  # a broken file must not break downloads
-        logger.error("Could not read job history %s: %s", path, e)
-        return
+        logger.error("Could not read job history %s, keeping it as .broken: %s", path, e)
+        try:
+            os.replace(path, f'{path}.broken')
+        except OSError:
+            pass
+        data = []
     if isinstance(data, list):
         for entry in data:
             if isinstance(entry, dict) and isinstance(entry.get('id'), str):
                 _entries[entry['id']] = entry
+    if _import_existing_zips_locked():
+        _save_locked()
+
+
+def _import_existing_zips_locked():
+    """Add finished zips from before the history existed (or from a lost file).
+
+    Only what the zip tells: name from its comment, size, songs, and its
+    time as the finish time. There is no start time, so no duration.
+    """
+    try:
+        names = os.listdir(MUSIC_DIR)
+    except OSError:
+        return False
+    added = False
+    for name in names:
+        unique_id = name[:-4]
+        if not name.endswith('.zip') or not is_job_id(unique_id) or unique_id in _entries:
+            continue
+        path = os.path.join(MUSIC_DIR, name)
+        try:
+            stat = os.stat(path)
+            with zipfile.ZipFile(path) as archive:
+                songs = sum(1 for info in archive.infolist() if not info.is_dir() and not info.filename.endswith('.txt'))
+        except (OSError, zipfile.BadZipFile):
+            continue
+        _entries[unique_id] = {
+            'id': unique_id, 'status': 'completed', 'imported': True,
+            'created_at': stat.st_mtime, 'finished_at': stat.st_mtime,
+            'title': read_zip_title(path), 'size_bytes': stat.st_size, 'songs_saved': songs,
+            'failed_tracks': [],
+        }
+        added = True
+    return added
 
 
 def _save_locked():

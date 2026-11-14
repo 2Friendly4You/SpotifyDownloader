@@ -176,3 +176,59 @@ def test_history_survives_a_restart(tmp_path, monkeypatch):
     history._entries.clear()
     (entry,) = history.entries()
     assert (entry["id"], entry["status"], entry["message"]) == ("a", "failed", "boom")
+
+
+def test_users_learn_that_the_admin_cancelled_their_job(client, monkeypatch):
+    emitted = []
+    monkeypatch.setattr(downloads.socketio, "emit", lambda event, data, **k: emitted.append((event, data)))
+    from app.routes import admin as admin_routes
+    monkeypatch.setattr(admin_routes.socketio, "emit", lambda event, data, **k: emitted.append((event, data)))
+    monkeypatch.setattr(downloads.cancellation, "stop", lambda unique_id: None)
+    download_state.set_limit(1)
+    running_id = client.post("/api/search", json=SONG).get_json()["unique_id"]
+    queued_id = client.post("/api/search", json=SONG).get_json()["unique_id"]
+    login(client)
+
+    client.post(f"/api/admin/jobs/{queued_id}/cancel")
+    assert ("download_cancelled", {"unique_id": queued_id, "by_admin": True}) in emitted
+
+    client.post(f"/api/admin/jobs/{running_id}/cancel")
+    downloads.finish_cancelled(running_id)  # what the worker does once it stopped
+    assert ("download_cancelled", {"unique_id": running_id, "by_admin": True}) in emitted
+
+
+def test_a_users_own_cancel_is_not_reported_as_an_admin_cancel(monkeypatch):
+    emitted = []
+    monkeypatch.setattr(downloads.socketio, "emit", lambda event, data, **k: emitted.append((event, data)))
+    unique_id = str(uuid.uuid4())
+    downloads.finish_cancelled(unique_id)
+    assert emitted == [("download_cancelled", {"unique_id": unique_id})]
+
+
+def test_zips_from_before_the_history_are_imported(tmp_path, monkeypatch):
+    from app.titles import write_zip_title
+    unique_id = str(uuid.uuid4())
+    path = MUSIC / f"{unique_id}.zip"
+    import zipfile
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("A - One.mp3", b"1")
+        archive.writestr("B - Two.mp3", b"2")
+        archive.writestr("failed_tracks.txt", b"x")
+    write_zip_title(str(path), "Old Mix 🎻")
+    monkeypatch.setenv("JOB_HISTORY_FILE", str(tmp_path / "jobs.json"))
+    history.reset_for_tests()
+    monkeypatch.setattr(history, "_loaded", False)
+    (entry,) = history.entries()
+    assert (entry["id"], entry["title"], entry["songs_saved"], entry["status"]) == (unique_id, "Old Mix 🎻", 2, "completed")
+    assert "started_at" not in entry  # no made-up duration
+    assert (tmp_path / "jobs.json").exists()
+
+
+def test_a_broken_history_file_is_kept_aside(tmp_path, monkeypatch):
+    broken = tmp_path / "jobs.json"
+    broken.write_text("{not json")
+    monkeypatch.setenv("JOB_HISTORY_FILE", str(broken))
+    history.reset_for_tests()
+    monkeypatch.setattr(history, "_loaded", False)
+    assert history.entries() == []
+    assert (tmp_path / "jobs.json.broken").read_text() == "{not json"
