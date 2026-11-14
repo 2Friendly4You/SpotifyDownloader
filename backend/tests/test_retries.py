@@ -198,6 +198,8 @@ def test_a_playlist_where_every_song_failed_lists_them_all(monkeypatch, client, 
     body = client.get("/api/status/retry-job").get_json()
     assert body["status"] == "failed"
     assert len(body["failed_tracks"]) == 2
+    # The songs and reasons are listed on the card; no raw spotDL error.
+    assert failed[-1]["message"] == "Download failed: No song could be downloaded."
 
 
 def test_clean_download_has_no_failed_tracks_field(monkeypatch, client, _quiet):

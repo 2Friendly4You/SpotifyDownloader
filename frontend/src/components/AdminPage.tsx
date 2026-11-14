@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { apiFetch } from "../api";
 import { formatBytes, formatDateTime, formatDuration, formatRelative, groupByDay } from "../admin/format";
 import { etaLabel } from "../eta";
+import { serverMessage } from "../serverMessages";
 import { useNotification } from "./Notification";
 import Alert from "./Alert";
 import ThemeSwitcher from "./ThemeSwitcher";
@@ -166,7 +167,7 @@ function RecentJob({ job, onDelete }: { job: AdminJob; onDelete: (job: AdminJob)
         {songs && <span>{songs}</span>}
         {job.format && <span>{job.format.toUpperCase()}</span>}
       </p>
-      {job.status === "failed" && job.message && <p className={styles.errorText}>{job.message}</p>}
+      {job.status === "failed" && job.message && <p className={styles.errorText}>{serverMessage(job.message, i18n.language)}</p>}
       <FailedSongs job={job} />
       {job.status === "completed" && (
         <div className={styles.actions}>

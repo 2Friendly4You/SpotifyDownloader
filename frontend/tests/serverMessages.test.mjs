@@ -15,6 +15,10 @@ test("prefixed failures keep their detail", () => {
     serverMessage("Download failed: No songs found for that search.", "de"),
     "Download fehlgeschlagen: Für deine Suche wurden keine Songs gefunden."
   );
+  assert.equal(
+    serverMessage("Download failed: No song could be downloaded.", "de"),
+    "Download fehlgeschlagen: Kein Song konnte heruntergeladen werden."
+  );
   assert.equal(serverMessage("Download failed: HTTP 403", "de"), "Download fehlgeschlagen: HTTP 403");
 });
 

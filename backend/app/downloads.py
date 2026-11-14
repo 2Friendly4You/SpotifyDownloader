@@ -425,7 +425,12 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
         succeeded, download_failures = download_with_retries(downloader, songs, audio_format, progress)
         failed_tracks += download_failures
         if not succeeded:
-            detail = downloader.errors[0] if downloader.errors else "No files were downloaded."
+            # The card lists each failed song with its reason, so the job
+            # message stays short instead of repeating spotDL's raw error.
+            if failed_tracks:
+                detail = "No song could be downloaded."
+            else:
+                detail = downloader.errors[0] if downloader.errors else "No files were downloaded."
             mark_failed(unique_id, search_query, f"Download failed: {detail[:150]}", failed_tracks)
             return
 

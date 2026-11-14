@@ -15,6 +15,7 @@ const GERMAN: Record<string, string> = {
   "The downloaded archive is corrupted.": "Die ZIP-Datei ist beschädigt.",
   "The downloaded archive is empty.": "Die ZIP-Datei ist leer.",
   "No songs found for that search.": "Für deine Suche wurden keine Songs gefunden.",
+  "No song could be downloaded.": "Kein Song konnte heruntergeladen werden.",
   "No files were downloaded.": "Es wurden keine Dateien heruntergeladen.",
 };
 
