@@ -104,9 +104,9 @@ def content_disposition(filename, fallback):
     """``attachment`` header with an ASCII name plus the full name per RFC 5987/6266."""
     ascii_name = unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
     ascii_name = re.sub(r'[^A-Za-z0-9 ._()\[\]&+,;=!#$%\'@^`{}~-]', '_', ascii_name)
-    ascii_name = _SPACES.sub(' ', ascii_name).strip()
-    if not ascii_name.removesuffix('.zip').strip(' ._'):
-        ascii_name = fallback
+    stem = _SPACES.sub(' ', ascii_name.removesuffix('.zip')).strip(' .')
+    # A dropped emoji at the end must not leave "Name .zip".
+    ascii_name = f'{stem}.zip' if stem.strip(' ._') else fallback
     header = f'attachment; filename="{ascii_name}"'
     if ascii_name != filename:
         header += f"; filename*=UTF-8''{quote(filename, safe='')}"
