@@ -82,7 +82,7 @@
     },
     "DownloadCounter": {
         "downloadCounter": "Download Counter",
-        "downloadCount": "{{count}} Songs/ Playlists were already downloaded"
+        "downloadCount": "{{count}} downloads so far (songs and playlists)"
     },
     "FAQ": {
         "title": "FAQ",
