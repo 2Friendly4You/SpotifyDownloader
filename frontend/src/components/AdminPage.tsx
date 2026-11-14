@@ -100,7 +100,7 @@ function ActiveJob({ job, onCancel }: { job: AdminJob; onCancel: (job: AdminJob)
     <li className={styles.card}>
       <div className={styles.cardHeader}>
         <div className={styles.cardTitle}>
-          <h3 title={jobName(job, job.id)}>{job.title || t("RequestComponent.resolvingName")}</h3>
+          <h3 title={jobName(job, t("Admin.unnamed"))}>{job.title || t("RequestComponent.resolvingName")}</h3>
           {job.query && job.query !== job.title && <p className={styles.source} title={job.query}>{job.query}</p>}
         </div>
         <StatusBadge status={job.status} />
@@ -148,8 +148,12 @@ function RecentJob({ job, onDelete }: { job: AdminJob; onDelete: (job: AdminJob)
     <li className={styles.card}>
       <div className={styles.cardHeader}>
         <div className={styles.cardTitle}>
-          <h3 title={jobName(job, job.id)}>{jobName(job, job.id)}</h3>
-          {job.query && job.query !== job.title && <p className={styles.source} title={job.query}>{job.query}</p>}
+          <h3 title={jobName(job, t("Admin.unnamed"))}>{jobName(job, t("Admin.unnamed"))}</h3>
+          {job.query && job.query !== job.title ? (
+            <p className={styles.source} title={job.query}>{job.query}</p>
+          ) : (
+            !job.query && <p className={styles.source}>{t("Admin.fileId", { id: job.id })}</p>
+          )}
         </div>
         <StatusBadge status={job.status} />
       </div>
@@ -338,17 +342,17 @@ function AdminPage() {
   const askCancel = (job: AdminJob) =>
     setConfirm({
       title: t("Admin.cancelTitle"),
-      message: t("Admin.cancelMessage", { name: jobName(job, job.id) }),
+      message: t("Admin.cancelMessage", { name: jobName(job, t("Admin.unnamed")) }),
       confirmLabel: t("Admin.cancelJob"),
       run: async () => {
-        await post(`/api/admin/jobs/${job.id}/cancel`, undefined, () => t("Admin.cancelDone", { name: jobName(job, job.id) }));
+        await post(`/api/admin/jobs/${job.id}/cancel`, undefined, () => t("Admin.cancelDone", { name: jobName(job, t("Admin.unnamed")) }));
       },
     });
 
   const askDelete = (job: AdminJob) =>
     setConfirm({
       title: t("Admin.deleteFileTitle"),
-      message: t("Admin.deleteFileMessage", { name: jobName(job, job.id), size: formatBytes(job.size_bytes, locale) }),
+      message: t("Admin.deleteFileMessage", { name: jobName(job, t("Admin.unnamed")), size: formatBytes(job.size_bytes, locale) }),
       confirmLabel: t("Admin.deleteFile"),
       run: async () => {
         await post(`/api/admin/jobs/${job.id}/delete-file`, undefined, (data) =>
