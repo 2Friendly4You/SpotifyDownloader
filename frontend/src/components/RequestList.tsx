@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import styles from "./RequestList.module.css";
 import { RequestComponent } from "./RequestComponent";
@@ -9,13 +10,18 @@ function Requests() {
   const { requests, clearRequests, removeRequest } = useDownloads();
   const { alertState, showAlert, hideAlert, confirmAction } = useAlert();
 
+  // Picks the dialog buttons: "OK/Abbrechen" is ambiguous when the question itself is "abbrechen?".
+  const [cancellingActive, setCancellingActive] = useState(false);
+
   const handleClearRequests = () => {
+    setCancellingActive(false);
     showAlert(t("Alert.deleteRequests"), t("Alert.deleteRequestsMessage"));
   };
 
   const handleCloseRequest = (uniqueId: string) => {
     const request = requests.find((item) => item.unique_id === uniqueId);
     const active = request?.status === "pending" || request?.status === "queued";
+    setCancellingActive(active);
     showAlert(
       t(active ? "Alert.cancelRequest" : "Alert.deleteRequest"),
       t(active ? "Alert.cancelRequestMessage" : "Alert.deleteRequestMessage", { title: request?.searchQuery }),
@@ -55,6 +61,11 @@ function Requests() {
         message={alertState.message}
         onConfirm={() => confirmAction(handleConfirmAction)}
         onCancel={hideAlert}
+        {...(alertState.requestId === null
+          ? {}
+          : cancellingActive
+            ? { confirmLabel: t("Alert.cancelRequestConfirm"), cancelLabel: t("Alert.keepDownloading"), danger: true }
+            : { confirmLabel: t("Alert.removeConfirm") })}
       />
     </div>
   );

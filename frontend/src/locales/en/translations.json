@@ -47,7 +47,7 @@
         },
         "status": {
             "queued": "Queued",
-            "pending": "Pending",
+            "pending": "In progress",
             "completed": "Completed",
             "failed": "Failed",
             "error": "Error"
@@ -68,11 +68,14 @@
     "Alert": {
         "ok": "OK",
         "cancel": "Cancel",
-        "deleteRequest": "Delete Request",
+        "deleteRequest": "Remove entry",
         "cancelRequest": "Cancel download",
         "cancelRequestMessage": "Are you sure you want to cancel the download of \"{{title}}\"? Files downloaded so far will be deleted.",
+        "cancelRequestConfirm": "Cancel and delete",
+        "keepDownloading": "Keep downloading",
+        "removeConfirm": "Remove",
         "deleteRequests": "Delete Requests",
-        "deleteRequestMessage": "Are you sure you want to delete \"{{title}}\"?",
+        "deleteRequestMessage": "Remove \"{{title}}\" from the list?",
         "deleteRequestsMessage": "Are you sure you want to delete all requests?"
     },
     "DownloadCounter": {
@@ -115,8 +118,8 @@
                 "a": "'Queued' means your request was accepted and is waiting for a free download slot. The server only runs a limited number of downloads at once. Your request starts automatically when a running download finishes."
             },
             {
-                "q": "Why is my download showing as 'pending' for a long time?",
-                "a": "'Pending' means the song is currently being downloaded or converted. Playlists can take several minutes. Please wait until the progress bar finishes."
+                "q": "Why does my download show 'In progress' for a long time?",
+                "a": "'In progress' means the songs are being searched, downloaded or converted. Playlists can take several minutes. The counter and the time left under the bar show how far along it is."
             },
             {
                 "q": "Why did I get an error like 'Download queue is full'?",
@@ -181,5 +184,21 @@
         "viewOnGitHub": "View on GitHub",
         "createdBy": "Created with ❤️ by",
         "author": "2Friendly4You"
+    },
+    "Toasts": {
+        "queuedTitle": "Queued",
+        "queuedMessage": "\"{{query}}\" is waiting for a free slot.",
+        "sentTitle": "Request sent",
+        "sentMessage": "The download of \"{{query}}\" has started.",
+        "searchErrorTitle": "Search error",
+        "searchErrorMessage": "Failed to start the download.",
+        "errorTitle": "Error",
+        "networkMessage": "Network error or server unreachable. Please check your connection.",
+        "downloadFailedTitle": "Download failed",
+        "downloadStartedTitle": "Download started",
+        "downloadStartedMessage": "Downloading the ZIP file for \"{{query}}\".",
+        "errorLogTitle": "Error log",
+        "errorLogMessage": "Downloading the error log for \"{{query}}\".",
+        "fileGoneMessage": "Failed to start the download. The file is probably no longer available."
     }
 }

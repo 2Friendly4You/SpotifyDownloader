@@ -47,7 +47,7 @@
         },
         "status": {
             "queued": "In der Warteschlange",
-            "pending": "Ausstehend",
+            "pending": "Wird geladen",
             "completed": "Abgeschlossen",
             "failed": "Fehlgeschlagen",
             "error": "Fehler"
@@ -68,11 +68,14 @@
     "Alert": {
         "ok": "OK",
         "cancel": "Abbrechen",
-        "deleteRequest": "Anfrage löschen",
+        "deleteRequest": "Eintrag entfernen",
         "cancelRequest": "Download abbrechen",
         "cancelRequestMessage": "Sind Sie sicher, dass Sie den Download von \"{{title}}\" abbrechen möchten? Bereits geladene Dateien werden gelöscht.",
+        "cancelRequestConfirm": "Abbrechen und löschen",
+        "keepDownloading": "Weiterladen",
+        "removeConfirm": "Entfernen",
         "deleteRequests": "Anfragen löschen",
-        "deleteRequestMessage": "Sind Sie sicher, dass Sie \"{{title}}\" löschen möchten?",
+        "deleteRequestMessage": "Möchten Sie \"{{title}}\" aus der Liste entfernen?",
         "deleteRequestsMessage": "Sind Sie sicher, dass Sie alle Anfragen löschen möchten?"
     },
     "DownloadCounter": {
@@ -115,8 +118,8 @@
                 "a": "'In der Warteschlange' bedeutet, dass Ihre Anfrage angenommen wurde und auf einen freien Download-Platz wartet. Der Server führt nur eine begrenzte Anzahl Downloads gleichzeitig aus. Ihre Anfrage startet automatisch, sobald ein laufender Download fertig ist."
             },
             {
-                "q": "Warum steht mein Download lange auf 'ausstehend'?",
-                "a": "'Ausstehend' bedeutet, dass der Song gerade heruntergeladen oder konvertiert wird. Playlists können mehrere Minuten dauern. Bitte warten Sie, bis der Fortschrittsbalken fertig ist."
+                "q": "Warum steht mein Download lange auf 'Wird geladen'?",
+                "a": "'Wird geladen' bedeutet, dass die Songs gerade gesucht, heruntergeladen oder konvertiert werden. Playlists können mehrere Minuten dauern. Der Zähler und die Restzeit unter dem Balken zeigen, wie weit es ist."
             },
             {
                 "q": "Warum erhalte ich eine Fehlermeldung wie 'Download-Warteschlange ist voll'?",
@@ -181,5 +184,21 @@
         "viewOnGitHub": "Auf GitHub ansehen",
         "createdBy": "Erstellt mit ❤️ von",
         "author": "2Friendly4You"
+    },
+    "Toasts": {
+        "queuedTitle": "In der Warteschlange",
+        "queuedMessage": "\"{{query}}\" wartet auf einen freien Platz.",
+        "sentTitle": "Anfrage gesendet",
+        "sentMessage": "Der Download von \"{{query}}\" wurde gestartet.",
+        "searchErrorTitle": "Suchfehler",
+        "searchErrorMessage": "Der Download konnte nicht gestartet werden.",
+        "errorTitle": "Fehler",
+        "networkMessage": "Netzwerkfehler oder Server nicht erreichbar. Bitte prüfen Sie Ihre Verbindung.",
+        "downloadFailedTitle": "Download fehlgeschlagen",
+        "downloadStartedTitle": "Download gestartet",
+        "downloadStartedMessage": "Die ZIP-Datei für \"{{query}}\" wird heruntergeladen.",
+        "errorLogTitle": "Fehlerprotokoll",
+        "errorLogMessage": "Das Fehlerprotokoll für \"{{query}}\" wird heruntergeladen.",
+        "fileGoneMessage": "Der Download konnte nicht gestartet werden. Die Datei ist vermutlich nicht mehr verfügbar."
     }
 }
