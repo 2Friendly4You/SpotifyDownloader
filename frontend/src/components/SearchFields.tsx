@@ -27,6 +27,23 @@ const OUTPUT_FORMATS = ["mp3", "m4a", "wav", "flac", "ogg", "opus"];
 
 const YOUTUBE_REGEX = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
 
+const HIGHLIGHT_CLASS = "jump-highlight";
+// Animation (2 s plus 0.3 s delay) and a margin, in case animationend never fires.
+const HIGHLIGHT_MS = 2600;
+
+// Scroll the card to the middle of the screen and let it glow briefly (see
+// .jump-highlight in App.css). The class is always removed afterwards.
+function highlightCard(card: HTMLElement) {
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  card.classList.remove(HIGHLIGHT_CLASS);
+  void card.offsetWidth; // restart the animation when clicked twice
+  card.classList.add(HIGHLIGHT_CLASS);
+  const clear = () => card.classList.remove(HIGHLIGHT_CLASS);
+  card.firstElementChild?.addEventListener("animationend", clear, { once: true });
+  window.setTimeout(clear, HIGHLIGHT_MS);
+}
+
 function SearchFields() {
   const { t } = useTranslation();
   const { submitSearch, requests } = useDownloads();
@@ -93,15 +110,7 @@ function SearchFields() {
     setQuery("");
     const card = document.getElementById(`request-${existing.unique_id}`);
     if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.animate(
-        [
-          { boxShadow: "0 0 0 0 transparent" },
-          { boxShadow: "0 0 0 4px var(--primary)" },
-          { boxShadow: "0 0 0 0 transparent" },
-        ],
-        { duration: 1800, easing: "ease-in-out" }
-      );
+      highlightCard(card);
     }
   };
 

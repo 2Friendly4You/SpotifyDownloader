@@ -56,6 +56,12 @@ class ThroughputEta:
     number is a guess, and the old prior made the card say "under a minute"
     for playlists that took several. The UI shows "calculating" instead.
 
+    A batch that fits into the workers (a single song, a short retry round)
+    has no queue, so the songs' own progress already tells the time left.
+    Waiting for the first finished song there meant the card said
+    "calculating" for the whole job. Such batches get an estimate after
+    ``early_elapsed`` seconds once they are ``early_work`` of the way.
+
     After that it measures throughput as finished songs plus the partial
     progress of the running ones, per second of the phase. That rate already
     includes the parallel workers. The rate is smoothed over time, and so is
@@ -68,13 +74,15 @@ class ThroughputEta:
     """
 
     def __init__(self, total, workers=4, min_elapsed=20.0, smoothing_seconds=20.0, settle_seconds=3.0,
-                 clock=time.monotonic):
+                 early_elapsed=2.0, early_work=0.15, clock=time.monotonic):
         self.total = max(int(total), 0)
         self.workers = max(int(workers), 1)
         self._clock = clock
         self._start = clock()
         self._min_elapsed = min_elapsed
         self._smoothing_seconds = smoothing_seconds
+        self._early_elapsed = early_elapsed
+        self._early_work = early_work
         # Songs finish in bursts within milliseconds. The first estimate is
         # only provisional for a moment, so the rest of the burst refines it
         # instead of being smoothed away.
@@ -92,8 +100,12 @@ class ThroughputEta:
             self._eta, self._last_update = 0.0, now
             return 0.0
         elapsed = now - self._start
-        if work <= 0 or elapsed <= 0 or (done < 1 and elapsed < self._min_elapsed):
+        if work <= 0 or elapsed <= 0:
             return None
+        if done < 1 and elapsed < self._min_elapsed:
+            fits = self.total <= self.workers
+            if not fits or elapsed < self._early_elapsed or work < self._early_work * self.total:
+                return None
         sample = work / elapsed
         if self._first_estimate_at is None:
             self._first_estimate_at = now

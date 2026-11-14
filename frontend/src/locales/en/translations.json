@@ -34,7 +34,8 @@
             "underMinute": "< 1 min left",
             "minutes": "About {{value}} min left",
             "hours": "About {{value}} h left",
-            "calculating": "Calculating time left…"
+            "calculating": "Calculating time left…",
+            "almostDone": "Almost done…"
         },
         "failedTracks": {
             "summary_one": "{{count}} song failed",

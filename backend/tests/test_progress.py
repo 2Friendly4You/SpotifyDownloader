@@ -313,3 +313,23 @@ def test_download_card_shows_one_calm_step(emitted, monkeypatch):
     assert progress_values == sorted(progress_values)
     assert emitted[-1][1]["songs_done"] == 3
     assert emitted[-1][1]["progress"] == 95.0
+
+
+def test_a_batch_that_fits_the_workers_gets_an_early_estimate():
+    clock = FakeClock()
+    single = ThroughputEta(1, workers=4, clock=clock)
+    assert single.update(0, 0.05) is None
+    clock.now += 1
+    assert single.update(0, 0.3) is None  # too early for any number
+    clock.now += 2
+    left = single.update(0, 0.5)
+    assert left == pytest.approx(3.0)  # half done after 3 s
+    clock.now += 1
+    assert single.update(0, 0.6) < left  # counts down instead of standing still
+
+
+def test_a_large_batch_still_waits_for_real_data():
+    clock = FakeClock()
+    eta = ThroughputEta(20, workers=4, clock=clock)
+    clock.now += 5
+    assert eta.update(0, 3.5) is None

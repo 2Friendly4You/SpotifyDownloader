@@ -34,7 +34,8 @@
             "underMinute": "Noch < 1 Min.",
             "minutes": "Noch ca. {{value}} Min.",
             "hours": "Noch ca. {{value}} Std.",
-            "calculating": "Restzeit wird berechnet…"
+            "calculating": "Restzeit wird berechnet…",
+            "almostDone": "Gleich fertig…"
         },
         "failedTracks": {
             "summary_one": "{{count}} Song fehlerhaft",
