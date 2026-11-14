@@ -4,7 +4,7 @@
   gap: 1rem;
 }
 
-.root button {
+.root form button {
   background: var(--primary);
   color: var(--on-primary);
   border: none;
@@ -15,7 +15,7 @@
   transition: opacity 0.2s, transform 0.2s;
 }
 
-.root button:hover {
+.root form button:hover {
   opacity: 0.9;
   transform: translateY(-2px);
 }

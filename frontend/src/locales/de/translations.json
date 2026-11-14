@@ -81,8 +81,8 @@
         "deleteRequestsMessage": "Sind Sie sicher, dass Sie alle Anfragen löschen möchten?"
     },
     "DownloadCounter": {
-        "downloadCounter": "Download Zähler",
-        "downloadCount": "{{count}} Songs/ Playlists wurden bereits heruntergeladen"
+        "downloadCounter": "Download-Zähler",
+        "downloadCount": "Bisher {{count}} Downloads (Songs und Playlists)"
     },
     "FAQ": {
         "title": "FAQ",

@@ -3,7 +3,7 @@ import { io, type Socket } from "socket.io-client";
 import { apiFetch } from "./api";
 import { useNotification } from "./components/Notification";
 import i18n from "./i18n";
-import { requestName } from "./requestName";
+import { normalizeQuery, requestName } from "./requestName";
 import type { DownloadRequest, FailedTrack, RequestStatus, SearchPayload } from "./components/Types";
 
 const STORAGE_KEY = "userDownloads";
@@ -324,9 +324,14 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
 
       if (result.ok && result.data.status === "success" && result.data.unique_id) {
         const queued = Boolean(result.data.queued);
+        // A restart of something already in the list keeps its known name
+        // until the server sends its own.
+        const key = normalizeQuery(payload.search_query);
+        const knownTitle = requests.find((item) => item.title && normalizeQuery(item.searchQuery) === key)?.title;
         upsertRequest({
           unique_id: result.data.unique_id,
           searchQuery: payload.search_query,
+          title: knownTitle,
           url: null,
           status: queued ? "queued" : "pending",
           message: "",
@@ -353,7 +358,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       notify("error", i18n.t("Toasts.errorTitle"), i18n.t("Toasts.networkMessage"));
       return false;
     }
-  }, [notify, upsertRequest]);
+  }, [notify, requests, upsertRequest]);
 
   const removeRequest = useCallback((uniqueId: string) => {
     updateRequests((current) => {
