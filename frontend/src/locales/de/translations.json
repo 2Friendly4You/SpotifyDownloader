@@ -74,13 +74,13 @@
         "cancel": "Abbrechen",
         "deleteRequest": "Eintrag entfernen",
         "cancelRequest": "Download abbrechen",
-        "cancelRequestMessage": "Sind Sie sicher, dass Sie den Download von \"{{title}}\" abbrechen möchten? Bereits geladene Dateien werden gelöscht.",
+        "cancelRequestMessage": "Willst du den Download von \"{{title}}\" wirklich abbrechen? Bereits geladene Dateien werden gelöscht.",
         "cancelRequestConfirm": "Abbrechen und löschen",
         "keepDownloading": "Weiterladen",
         "removeConfirm": "Entfernen",
         "deleteRequests": "Anfragen löschen",
-        "deleteRequestMessage": "Möchten Sie \"{{title}}\" aus der Liste entfernen?",
-        "deleteRequestsMessage": "Sind Sie sicher, dass Sie alle Anfragen löschen möchten?"
+        "deleteRequestMessage": "Möchtest du \"{{title}}\" aus der Liste entfernen?",
+        "deleteRequestsMessage": "Willst du wirklich alle Anfragen löschen?"
     },
     "DownloadCounter": {
         "downloadCounter": "Download-Zähler",
@@ -91,35 +91,35 @@
         "questions": [
             {
                 "q": "Wie lade ich Songs herunter?",
-                "a": "Geben Sie einen Songtitel oder eine direkte Spotify-URL in die Suchleiste ein. Wählen Sie Ihren bevorzugten Audioanbieter, ggf. einen Lyrics-Anbieter und das Ausgabeformat. Klicken Sie dann auf 'Suche'. Sobald die Ergebnisse erscheinen, klicken Sie auf den 'Download'-Button neben dem gewünschten Track oder neben dem Playlist-/Albumcover."
+                "a": "Gib einen Songtitel oder eine Spotify-URL in die Suchleiste ein. Wähle deinen bevorzugten Audioanbieter, bei Bedarf einen Lyrics-Anbieter und das Ausgabeformat, und klicke auf 'Suche'. Unter 'Anfragen' erscheint dann eine Karte mit dem Fortschritt. Sobald der Download fertig ist, klickst du dort auf 'Download' und bekommst eine ZIP-Datei."
             },
             {
                 "q": "Wie lade ich Playlists oder Alben herunter?",
-                "a": "Sie können Playlists oder Alben herunterladen, indem Sie deren Spotify-URL in die Suchleiste eingeben. Die Playlist/das Album muss öffentlich oder zugänglich sein. Nach der Suche erscheint ein Download-Button für die gesamte Playlist/das Album. Das Herunterladen großer Playlists kann viel Zeit in Anspruch nehmen."
+                "a": "Gib die Spotify-URL der Playlist oder des Albums in die Suchleiste ein. Die Playlist bzw. das Album muss öffentlich sein. Wenn alle Songs geladen sind, lädst du die ganze Playlist bzw. das ganze Album mit dem 'Download'-Button auf der Karte als eine ZIP-Datei herunter. Große Playlists können eine Weile dauern."
             },
             {
                 "q": "Was sind Audioanbieter?",
-                "a": "Audioanbieter sind die Quellen, von denen die Audiodateien heruntergeladen werden (nicht direkt von Spotify). Verschiedene Anbieter bieten unterschiedliche Qualität oder Verfügbarkeit. Wenn Sie unsicher sind, ist 'YouTube Music' eine gute Wahl."
+                "a": "Audioanbieter sind die Quellen, von denen die Audiodateien heruntergeladen werden (nicht direkt von Spotify). Verschiedene Anbieter bieten unterschiedliche Qualität oder Verfügbarkeit. Wenn du unsicher bist, ist 'YouTube Music' eine gute Wahl."
             },
             {
                 "q": "Was sind Lyrics-Anbieter?",
-                "a": "Lyrics-Anbieter sind die Quellen für Songtexte. Wenn Sie einen Anbieter wählen, werden die Songtexte in die Audiodatei eingebettet (sofern das Format es unterstützt, z.B. MP3, FLAC) oder als separate .lrc-Datei gespeichert."
+                "a": "Lyrics-Anbieter sind die Quellen für Songtexte. Wenn du einen Anbieter wählst, werden die Songtexte in die Audiodatei eingebettet (sofern das Format es unterstützt, z. B. MP3, FLAC) oder als separate .lrc-Datei gespeichert."
             },
             {
                 "q": "Was sind Ausgabeformate?",
-                "a": "Ausgabeformate bestimmen den Dateityp Ihrer heruntergeladenen Audiodatei (z.B. MP3, FLAC, M4A). MP3 ist weit verbreitet, FLAC bietet verlustfreie Qualität. Wählen Sie je nach Bedarf."
+                "a": "Das Ausgabeformat bestimmt den Dateityp deiner heruntergeladenen Songs (z. B. MP3, FLAC, M4A). MP3 ist weit verbreitet, FLAC bietet verlustfreie Qualität. Wähle je nach Bedarf."
             },
             {
                 "q": "Wie stelle ich die beste Audioqualität sicher?",
-                "a": "Für eine potenziell höhere Audioqualität wählen Sie 'YouTube Music' als Audioanbieter und ein verlustfreies Format wie FLAC als Ausgabeformat. Die Qualität hängt jedoch letztlich vom verfügbaren Quellmaterial ab."
+                "a": "Für eine möglichst gute Audioqualität wählst du 'YouTube Music' als Audioanbieter und ein verlustfreies Format wie FLAC als Ausgabeformat. Die Qualität hängt aber letztlich vom verfügbaren Quellmaterial ab."
             },
             {
                 "q": "Was passiert, wenn ein Song nicht heruntergeladen werden kann?",
-                "a": "Wenn ein Song beim gewählten Audioanbieter nicht gefunden oder heruntergeladen werden kann, erhalten Sie eine Benachrichtigung in der UI. Dies kann an der Verfügbarkeit beim Anbieter oder anderen Problemen liegen. Versuchen Sie einen anderen Anbieter oder prüfen Sie die Verfügbarkeit direkt auf der Plattform."
+                "a": "Wenn ein Song beim gewählten Audioanbieter nicht gefunden oder heruntergeladen werden kann, versucht der Server es automatisch noch einmal, auch bei anderen Anbietern. Klappt es trotzdem nicht, siehst du auf der Karte, welche Songs fehlen und warum. Du kannst es dann mit einem anderen Anbieter erneut versuchen."
             },
             {
                 "q": "Warum steht mein Download auf 'In der Warteschlange'?",
-                "a": "'In der Warteschlange' bedeutet, dass Ihre Anfrage angenommen wurde und auf einen freien Download-Platz wartet. Der Server führt nur eine begrenzte Anzahl Downloads gleichzeitig aus. Ihre Anfrage startet automatisch, sobald ein laufender Download fertig ist."
+                "a": "'In der Warteschlange' bedeutet, dass deine Anfrage angenommen wurde und auf einen freien Download-Platz wartet. Der Server führt nur eine begrenzte Anzahl Downloads gleichzeitig aus. Deine Anfrage startet automatisch, sobald ein laufender Download fertig ist."
             },
             {
                 "q": "Warum steht mein Download lange auf 'Wird geladen'?",
@@ -127,11 +127,11 @@
             },
             {
                 "q": "Warum erhalte ich eine Fehlermeldung wie 'Download-Warteschlange ist voll'?",
-                "a": "Diese Meldung erscheint, wenn bereits zu viele Anfragen warten. Der Server nimmt neue Downloads nur bis zur Warteschlangengrenze an. Warten Sie, bis wartende Einträge starten, und versuchen Sie es erneut. Ein Administrator kann das Limit für gleichzeitige Downloads erhöhen, damit die Warteschlange schneller abgearbeitet wird."
+                "a": "Diese Meldung erscheint, wenn bereits zu viele Anfragen warten. Der Server nimmt neue Downloads nur bis zur Warteschlangengrenze an. Warte, bis wartende Einträge starten, und versuch es dann erneut. Ein Administrator kann das Limit für gleichzeitige Downloads erhöhen, damit die Warteschlange schneller abgearbeitet wird."
             },
             {
                 "q": "Kann ich Musik mit YouTube-Links herunterladen?",
-                "a": "Ja! Sie können Musik mit YouTube-Links herunterladen. Fügen Sie einfach eine YouTube-Video-URL in die Suchleiste ein, wählen Sie das gewünschte Ausgabeformat und klicken Sie auf 'Suche'. Das System verarbeitet das Video und stellt Ihnen einen Download-Link bereit."
+                "a": "Ja! Füge einfach eine YouTube-Video-URL in die Suchleiste ein, wähle das gewünschte Ausgabeformat und klicke auf 'Suche'. Der Server lädt das Video als Audio herunter, und du bekommst auf der Karte einen Download-Button."
             }
         ]
     },
@@ -154,7 +154,7 @@
         "searchErrorTitle": "Suchfehler",
         "searchErrorMessage": "Der Download konnte nicht gestartet werden.",
         "errorTitle": "Fehler",
-        "networkMessage": "Netzwerkfehler oder Server nicht erreichbar. Bitte prüfen Sie Ihre Verbindung.",
+        "networkMessage": "Netzwerkfehler oder Server nicht erreichbar. Bitte prüfe deine Verbindung.",
         "downloadFailedTitle": "Download fehlgeschlagen",
         "downloadStartedTitle": "Download gestartet",
         "downloadStartedMessage": "Die ZIP-Datei für \"{{query}}\" wird heruntergeladen.",
@@ -166,7 +166,7 @@
         "runningTitle": "Dieser Download läuft bereits",
         "finishedTitle": "Dieser Download ist schon fertig",
         "runningMessage": "\"{{name}}\" wird gerade heruntergeladen oder wartet in der Warteschlange.",
-        "finishedMessage": "\"{{name}}\" wurde vor Kurzem schon heruntergeladen und steht noch in Ihrer Liste.",
+        "finishedMessage": "\"{{name}}\" wurde vor Kurzem schon heruntergeladen und steht noch in deiner Liste.",
         "showRunning": "Laufenden Download zeigen",
         "showFinished": "Fertigen Download zeigen",
         "restart": "Trotzdem neu starten",

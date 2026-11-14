@@ -5,6 +5,7 @@ import type { DownloadRequest } from "./Types";
 import { useDownloads } from "../DownloadsContext";
 import { etaLabel as pickEtaLabel } from "../eta";
 import { requestName } from "../requestName";
+import { serverMessage } from "../serverMessages";
 
 const ETA_TICK_MS = 5000;
 
@@ -141,7 +142,7 @@ function RequestComponent({
           {secondaryLabel && <span className={styles.progressEta}>{secondaryLabel}</span>}
         </div>
       )}
-      {request.message && <p className={styles.message}>{request.message}</p>}
+      {request.message && <p className={styles.message}>{serverMessage(request.message, i18n.language)}</p>}
       {failedTracks.length > 0 && (
         <details className={styles.failedTracks}>
           <summary>{t("RequestComponent.failedTracks.summary", { count: failedTracks.length })}</summary>

@@ -152,6 +152,7 @@ class SongProgress:
         self.total = max(int(total), 0)
         self._partial = {}
         self._finished = set()
+        self._errors = set()
         self._fraction = 0.0
 
     def update(self, key, percent, message):
@@ -159,6 +160,8 @@ class SongProgress:
             if message in self.FINISHED_MESSAGES or (percent or 0) >= 100:
                 self._finished.add(key)
                 self._partial.pop(key, None)
+                if message == 'Error':
+                    self._errors.add(key)
             else:
                 self._partial[key] = max(0.0, min(1.0, (percent or 0) / 100))
         if self.total:
@@ -169,6 +172,11 @@ class SongProgress:
     @property
     def done(self):
         return min(len(self._finished), self.total)
+
+    @property
+    def saved(self):
+        """Finished songs that did not fail: the ones the user will get."""
+        return min(len(self._finished - self._errors), self.total)
 
     @property
     def running(self):
