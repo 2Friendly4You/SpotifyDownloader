@@ -170,3 +170,48 @@ button:hover {
         width: auto;
     }
 }
+/* "Show the running/finished download" from the duplicate warning: a short
+   accent glow on the card that fades back to its normal look. The class is
+   removed when the animation ends, so nothing stays behind. */
+@keyframes jump-highlight {
+    0% {
+        box-shadow: 0 0 0 0 transparent;
+    }
+    15%,
+    60% {
+        box-shadow:
+            0 0 0 3px var(--primary),
+            0 0 22px 6px color-mix(in srgb, var(--primary) 45%, transparent);
+        background: color-mix(in srgb, var(--primary) 14%, var(--background));
+    }
+    38% {
+        box-shadow:
+            0 0 0 3px var(--primary),
+            0 0 8px 2px color-mix(in srgb, var(--primary) 25%, transparent);
+    }
+    100% {
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
+/* Gentler without motion: one steady ring that fades out, no pulsing glow. */
+@keyframes jump-highlight-calm {
+    0%,
+    65% {
+        box-shadow: 0 0 0 3px var(--primary);
+        background: color-mix(in srgb, var(--primary) 12%, var(--background));
+    }
+    100% {
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
+.jump-highlight > * {
+    animation: jump-highlight 2s ease-in-out 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .jump-highlight > * {
+        animation: jump-highlight-calm 2s ease-out;
+    }
+}

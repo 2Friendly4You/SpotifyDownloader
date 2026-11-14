@@ -22,3 +22,19 @@ export function roughEta(seconds?: number | null): RoughEta | null {
   }
   return { key: "hours", value: Math.max(1, Math.round(minutes / 30) / 2) };
 }
+
+export type EtaLabel = RoughEta["key"] | "almostDone" | "calculating";
+
+// Below this the countdown says "almost done" instead of a number, so a card
+// whose estimate has run out while the last song converts never looks stuck.
+export const ALMOST_DONE_SECONDS = 5;
+
+export function etaLabel(secondsLeft: number | null, estimating: boolean): { key: EtaLabel; value: number } | null {
+  if (secondsLeft != null && Number.isFinite(secondsLeft)) {
+    if (secondsLeft <= ALMOST_DONE_SECONDS) {
+      return { key: "almostDone", value: 0 };
+    }
+    return roughEta(secondsLeft);
+  }
+  return estimating ? { key: "calculating", value: 0 } : null;
+}

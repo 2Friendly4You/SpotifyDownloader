@@ -3,7 +3,7 @@ import { Trans, useTranslation } from "react-i18next";
 import styles from "./RequestComponent.module.css";
 import type { DownloadRequest } from "./Types";
 import { useDownloads } from "../DownloadsContext";
-import { roughEta } from "../eta";
+import { etaLabel as pickEtaLabel } from "../eta";
 import { requestName } from "../requestName";
 
 const ETA_TICK_MS = 5000;
@@ -58,15 +58,13 @@ function RequestComponent({
     request.etaSeconds == null
       ? null
       : Math.max(0, request.etaSeconds - (request.etaReceivedAt ? (now - request.etaReceivedAt) / 1000 : 0));
-  const eta = roughEta(secondsLeft);
   // Before the server has measured anything it sends no estimate; say so
   // instead of guessing "under a minute".
   const estimating = request.status === "pending" && (searching || downloading || retrying);
+  const eta = request.status === "pending" ? pickEtaLabel(secondsLeft, estimating) : null;
   const etaLabel = eta
     ? t(`RequestComponent.eta.${eta.key}`, { value: eta.value.toLocaleString(i18n.language) })
-    : estimating
-      ? t("RequestComponent.eta.calculating")
-      : "";
+    : "";
   const secondaryLabel = [runningLabel, etaLabel].filter(Boolean).join(" · ");
 
   const failedTracks =
