@@ -120,7 +120,7 @@ class CancellingDownloader(FakeDownloader):
 def test_cancelled_download_cleans_up_and_frees_its_slot(monkeypatch, events, client):
     folder = os.path.join(MUSIC_DIR, "cancel-job")
     monkeypatch.setattr(downloads, "Downloader", lambda settings: CancellingDownloader("youtube-music", {}, folder=folder))
-    monkeypatch.setattr(downloads, "search_songs", lambda d, q, r, is_cancelled=None: ([FakeSong("a"), FakeSong("b")], []))
+    monkeypatch.setattr(downloads, "search_songs", lambda d, q, r, is_cancelled=None, on_title=None: ([FakeSong("a"), FakeSong("b")], []))
 
     def job(unique_id):
         return {
@@ -152,7 +152,7 @@ def test_cancelled_download_cleans_up_and_frees_its_slot(monkeypatch, events, cl
 def test_a_cancel_that_arrives_after_packaging_still_removes_the_zip(monkeypatch, events, client):
     folder = os.path.join(MUSIC_DIR, "late-job")
     monkeypatch.setattr(downloads, "Downloader", lambda settings: FakeDownloader("youtube-music", {"a": 0}, folder=folder))
-    monkeypatch.setattr(downloads, "search_songs", lambda d, q, r, is_cancelled=None: ([FakeSong("a")], []))
+    monkeypatch.setattr(downloads, "search_songs", lambda d, q, r, is_cancelled=None, on_title=None: ([FakeSong("a")], []))
     original = downloads.publish_zip
 
     def publish_then_cancel(unique_id, *args, **kwargs):

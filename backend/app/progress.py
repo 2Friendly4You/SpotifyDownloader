@@ -4,10 +4,7 @@ The numbers here are meant for a coarse "about 5 minutes" hint in the UI,
 not for exact accounting.
 """
 import math
-import threading
 import time
-
-DEFAULT_SECONDS_PER_SONG = 6.0
 
 
 class EtaEstimator:
@@ -51,29 +48,73 @@ class EtaEstimator:
         return self._smoothed
 
 
-class SongRate:
-    """Remember how long a song takes to download, smoothed over recent jobs.
+class ThroughputEta:
+    """Seconds left for a batch of songs that several workers download at once.
 
-    Used as a prior while the song list is still being resolved and no real
-    download progress exists yet. It lives in process memory and starts from
-    a conservative default after a restart.
+    No estimate exists until the first song is finished, or until
+    ``min_elapsed`` seconds have passed with real progress: before that any
+    number is a guess, and the old prior made the card say "under a minute"
+    for playlists that took several. The UI shows "calculating" instead.
+
+    After that it measures throughput as finished songs plus the partial
+    progress of the running ones, per second of the phase. That rate already
+    includes the parallel workers. The rate is smoothed over time, and so is
+    the estimate itself, which counts down between updates and only drifts
+    toward a new value, so it does not jump when songs finish in bursts.
+
+    At the end fewer songs than workers are left. They run side by side, so
+    the rest takes about one song's duration times the work they have left,
+    not ``remaining / rate``.
     """
 
-    def __init__(self, default=DEFAULT_SECONDS_PER_SONG, alpha=0.3):
-        self._lock = threading.Lock()
-        self._seconds_per_song = default
-        self._alpha = alpha
+    def __init__(self, total, workers=4, min_elapsed=20.0, smoothing_seconds=20.0, settle_seconds=3.0,
+                 clock=time.monotonic):
+        self.total = max(int(total), 0)
+        self.workers = max(int(workers), 1)
+        self._clock = clock
+        self._start = clock()
+        self._min_elapsed = min_elapsed
+        self._smoothing_seconds = smoothing_seconds
+        # Songs finish in bursts within milliseconds. The first estimate is
+        # only provisional for a moment, so the rest of the burst refines it
+        # instead of being smoothed away.
+        self._settle_seconds = settle_seconds
+        self._first_estimate_at = None
+        self._rate = None
+        self._eta = None
+        self._last_update = None
 
-    def record(self, seconds, songs):
-        if songs <= 0 or seconds <= 0:
-            return
-        sample = seconds / songs
-        with self._lock:
-            self._seconds_per_song += self._alpha * (sample - self._seconds_per_song)
+    def update(self, done, work):
+        """``done`` finished songs, ``work`` finished plus partial songs."""
+        now = self._clock()
+        remaining = self.total - work
+        if remaining <= 1e-9:
+            self._eta, self._last_update = 0.0, now
+            return 0.0
+        elapsed = now - self._start
+        if work <= 0 or elapsed <= 0 or (done < 1 and elapsed < self._min_elapsed):
+            return None
+        sample = work / elapsed
+        if self._first_estimate_at is None:
+            self._first_estimate_at = now
+        settling = now - self._first_estimate_at < self._settle_seconds
+        dt = 0.0 if self._last_update is None else max(now - self._last_update, 0.0)
+        weight = 1.0 if settling else 1.0 - math.exp(-dt / self._smoothing_seconds)
+        self._rate = sample if self._rate is None else self._rate + weight * (sample - self._rate)
 
-    def estimate(self, songs):
-        with self._lock:
-            return max(songs, 0) * self._seconds_per_song
+        raw = remaining / self._rate
+        unfinished = self.total - done
+        if 0 < unfinished <= self.workers:
+            song_seconds = min(self.workers, self.total) / self._rate
+            raw = max(raw, song_seconds * remaining / unfinished)
+
+        if self._eta is None or settling:
+            self._eta = raw
+        else:
+            predicted = max(self._eta - dt, 0.0)
+            self._eta = predicted + weight * (raw - predicted)
+        self._last_update = now
+        return self._eta
 
 
 def round_eta(seconds):
@@ -82,8 +123,6 @@ def round_eta(seconds):
         return None
     return int(max(0.0, seconds) + 0.5)
 
-
-song_rate = SongRate()
 
 
 class SongProgress:

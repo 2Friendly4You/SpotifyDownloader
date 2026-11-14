@@ -3,6 +3,7 @@ import { io, type Socket } from "socket.io-client";
 import { apiFetch } from "./api";
 import { useNotification } from "./components/Notification";
 import i18n from "./i18n";
+import { requestName } from "./requestName";
 import type { DownloadRequest, FailedTrack, RequestStatus, SearchPayload } from "./components/Types";
 
 const STORAGE_KEY = "userDownloads";
@@ -19,6 +20,7 @@ type StatusResponse = {
   eta_seconds?: number;
   failed_tracks?: FailedTrack[];
   position?: number;
+  title?: string;
 };
 
 type SearchResponse = {
@@ -164,6 +166,8 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
           songsTotal: result.data.songs_total,
           songsRunning: result.data.songs_running,
           etaSeconds: result.data.eta_seconds,
+          etaReceivedAt: Date.now(),
+          title: result.data.title ?? item.title,
           // The server forgets the list after a restart; keep the copy we have.
           failedTracks: result.data.failed_tracks ?? item.failedTracks,
           queuePosition: nextStatus === "queued" ? result.data.position ?? item.queuePosition : undefined,
@@ -208,9 +212,16 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
                 songsTotal: data.songs_total,
                 songsRunning: data.songs_running,
                 etaSeconds: data.eta_seconds,
+                etaReceivedAt: Date.now(),
               }
             : item
         )
+      );
+    });
+
+    socket.on("download_title", (data: { unique_id: string; title: string }) => {
+      updateRequests((current) =>
+        current.map((item) => (item.unique_id === data.unique_id ? { ...item, title: data.title } : item))
       );
     });
 
@@ -247,15 +258,25 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       updateRequests((current) => current.filter((item) => item.unique_id !== data.unique_id));
     });
 
-    socket.on("download_complete", (data: { unique_id: string; url: string; failed_tracks?: FailedTrack[] }) => {
-      updateRequests((current) =>
-        current.map((item) =>
-          item.unique_id === data.unique_id
-            ? { ...item, status: "completed", url: data.url, message: "", failedTracks: data.failed_tracks }
-            : item
-        )
-      );
-    });
+    socket.on(
+      "download_complete",
+      (data: { unique_id: string; url: string; failed_tracks?: FailedTrack[]; title?: string }) => {
+        updateRequests((current) =>
+          current.map((item) =>
+            item.unique_id === data.unique_id
+              ? {
+                  ...item,
+                  status: "completed",
+                  url: data.url,
+                  message: "",
+                  failedTracks: data.failed_tracks,
+                  title: data.title ?? item.title,
+                }
+              : item
+          )
+        );
+      }
+    );
 
     socket.on(
       "download_failed",
@@ -265,6 +286,7 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
         search_query?: string;
         zip_url?: string | null;
         failed_tracks?: FailedTrack[];
+        title?: string;
       }) => {
         updateRequests((current) =>
           current.map((item) =>
@@ -275,11 +297,16 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
                   message: data.message || item.message,
                   url: data.zip_url ?? item.url,
                   failedTracks: data.failed_tracks,
+                  title: data.title ?? item.title,
                 }
               : item
           )
         );
-        notify("error", i18n.t("Toasts.downloadFailedTitle"), `${data.search_query || ""}: ${data.message || ""}`);
+        notify(
+          "error",
+          i18n.t("Toasts.downloadFailedTitle"),
+          `${data.title || data.search_query || ""}: ${data.message || ""}`
+        );
       }
     );
 
@@ -369,12 +396,12 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       const result = await apiFetch<StatusResponse>(`/api/status/${request.unique_id}`);
       if (result.data.status === "completed" && (result.data.url || request.url)) {
         triggerBrowserDownload(result.data.url || request.url || "");
-        notify("success", i18n.t("Toasts.downloadStartedTitle"), i18n.t("Toasts.downloadStartedMessage", { query: request.searchQuery }));
+        notify("success", i18n.t("Toasts.downloadStartedTitle"), i18n.t("Toasts.downloadStartedMessage", { query: requestName(request) }));
         return;
       }
       if (result.data.status === "failed" && (result.data.url || request.url)) {
         triggerBrowserDownload(result.data.url || request.url || "");
-        notify("info", i18n.t("Toasts.errorLogTitle"), i18n.t("Toasts.errorLogMessage", { query: request.searchQuery }));
+        notify("info", i18n.t("Toasts.errorLogTitle"), i18n.t("Toasts.errorLogMessage", { query: requestName(request) }));
         return;
       }
       notify("error", i18n.t("Toasts.errorTitle"), i18n.t("Toasts.fileGoneMessage"));

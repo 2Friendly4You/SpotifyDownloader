@@ -15,9 +15,10 @@
   background: var(--background);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
+  padding: 1.75rem;
+  max-width: 440px;
+  width: calc(100% - 2rem);
+  box-sizing: border-box;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   animation: slideIn 0.3s ease-out;
 }
@@ -36,11 +37,28 @@
   line-height: 1.5;
 }
 
+/*
+ * Buttons sit side by side while they fit. When they do not, each one gets
+ * a full-width row and the main action moves to the top (wrap-reverse), the
+ * usual mobile pattern, instead of a ragged second line.
+ */
 .buttonContainer {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: wrap-reverse;
+}
+
+.buttonContainer button {
+  flex: 1 1 auto;
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Three choices always stack: main action first, "back" last. */
+.buttonContainer.stacked {
+  flex-direction: column-reverse;
+  flex-wrap: nowrap;
 }
 
 /* The way out of the dialog is secondary, so it must not look like the confirm button. */

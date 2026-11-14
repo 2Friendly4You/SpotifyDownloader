@@ -159,7 +159,7 @@ def test_failed_tracks_text_lists_every_song():
 def _run(monkeypatch, songs, downloader_factory):
     monkeypatch.setattr(downloads, "ensure_spotify_client", lambda: None)
     monkeypatch.setattr(downloads, "Downloader", downloader_factory)
-    monkeypatch.setattr(downloads, "search_songs", lambda downloader, query, on_resolved, is_cancelled=None: (list(songs), []))
+    monkeypatch.setattr(downloads, "search_songs", lambda downloader, query, on_resolved, is_cancelled=None, on_title=None: (list(songs), []))
     download_state.accept({"unique_id": "retry-job"})
     downloads.run_spotdl("retry-job", "https://open.spotify.com/playlist/x", "youtube-music", None, "mp3")
 

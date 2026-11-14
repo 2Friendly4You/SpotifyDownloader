@@ -18,6 +18,8 @@ export type FailedTrack = {
 export type DownloadRequest = {
   unique_id: string;
   searchQuery: string;
+  // Playlist, album or song name from the server; unknown at first.
+  title?: string;
   url: string | null;
   status: RequestStatus;
   message: string;
@@ -27,6 +29,8 @@ export type DownloadRequest = {
   songsTotal?: number;
   songsRunning?: number;
   etaSeconds?: number;
+  // When etaSeconds arrived, so the card can count down between updates.
+  etaReceivedAt?: number;
   failedTracks?: FailedTrack[];
   queuePosition?: number;
   timestamp: string;
