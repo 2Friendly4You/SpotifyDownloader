@@ -41,6 +41,7 @@ export type DownloadRequest = {
 
 export type AdminSearchLog = {
   timestamp: string;
+  time?: number;
   ip: string;
   search_query: string;
   audio_format: string | null;
@@ -49,26 +50,90 @@ export type AdminSearchLog = {
   status_code: number | null;
 };
 
-export type AdminUsefulInfo = {
-  music_dir_path: string;
-  music_dir_zip_count?: number;
-  music_dir_used_space_mb?: number;
-  partition_total_space_gb?: number;
-  partition_free_space_gb?: number;
-  storage_info_error?: string;
-  cleanup_retention_days: string;
-  max_pending_requests_effective: number;
-  max_queued_requests_effective: number;
-  cleanup_age_interval: string;
-  cleanup_max_dir_size_mb: string;
-  cleanup_target_percentage: string;
-  cleanup_size_check_interval: string;
+export type AdminJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export type AdminJob = {
+  id: string;
+  title: string | null;
+  query: string | null;
+  source: "spotify" | "youtube" | null;
+  format: string | null;
+  provider: string | null;
+  status: AdminJobStatus;
+  created_at: number | null;
+  started_at: number | null;
+  finished_at: number | null;
+  size_bytes: number | null;
+  songs_total: number | null;
+  songs_saved: number | null;
+  message: string | null;
+  file_deleted_at: number | null;
+  file_available: boolean;
+  failed_tracks: FailedTrack[];
+  position?: number;
+  progress?: {
+    percent: number;
+    message: string;
+    songs_done?: number;
+    songs_total?: number;
+    songs_running?: number;
+    eta_seconds?: number;
+  };
+};
+
+export type AdminWindowStats = {
+  completed: number;
+  failed: number;
+  cancelled: number;
+  songs: number;
+  failed_songs: number;
+  bytes: number;
+  avg_duration_seconds: number | null;
 };
 
 export type AdminOverview = {
   last_requests: AdminSearchLog[];
-  running_requests: string[];
-  queued_requests: string[];
   current_limit: number;
-  useful_info: AdminUsefulInfo;
+  server_time: number;
+  jobs: { running: AdminJob[]; queued: AdminJob[]; recent: AdminJob[] };
+  stats: {
+    total_downloads: number;
+    history_since: number | null;
+    day: AdminWindowStats;
+    week: AdminWindowStats;
+    month: AdminWindowStats;
+    finishes: [number, string][];
+  };
+  storage: {
+    zip_count: number;
+    zip_bytes: number;
+    oldest_zip_at: number | null;
+    leftover_count: number;
+    leftover_bytes: number;
+    music_dir_bytes: number;
+    disk_total_bytes?: number;
+    disk_free_bytes?: number;
+    disk_used_bytes?: number;
+    error?: string;
+  };
+  health: {
+    started_at: number;
+    uptime_seconds: number;
+    load_average: [number, number, number] | null;
+    cpu_count: number | null;
+    memory_bytes: number | null;
+    ffmpeg: boolean;
+    cleanup_running: boolean;
+    music_dir_writable: boolean;
+    versions: { spotdl: string | null; yt_dlp: string | null; python: string };
+  };
+  settings: {
+    concurrent_limit: number;
+    queue_limit: number;
+    retention_days: number;
+    max_music_dir_mb: number;
+    cleanup_target_percent: number;
+    age_cleanup_interval_seconds: number;
+    size_check_interval_seconds: number;
+  };
 };

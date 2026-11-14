@@ -126,7 +126,16 @@ To change the exposed port (default: 8900), modify the ports section in `docker-
 5. Monitor the download progress in the "Requests" section. While spotDL looks up a playlist or album, the card shows how many songs it has resolved, and a rough time remaining appears once it can be estimated
 6. Click "Download" when the file is ready
 
-Admin panel: `http://localhost:8900/admin`
+Admin panel: `http://localhost:8900/admin`, with the `ADMIN_PASSWORD` login. It shows:
+
+- running and queued jobs, with their names and progress; you can cancel them
+- recent downloads, with name, size, duration, status and failed songs; you can download or delete a file
+- statistics for 24 hours, 7 days and 30 days, and a 14-day chart
+- the disk usage of the music folder and the partition; you can clean up old ZIPs and leftover folders
+- the parallel-download limit, which you can change
+- server health
+
+The job history is kept in `data/jobs.json` (newest 500 jobs; `JOB_HISTORY_FILE` changes the path).
 
 ## Local development
 
