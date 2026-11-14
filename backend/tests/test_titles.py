@@ -81,6 +81,8 @@ def test_content_disposition_has_an_ascii_name_and_the_full_utf8_name():
     assert content_disposition("Plain Mix.zip", "id.zip") == 'attachment; filename="Plain Mix.zip"'
     only_emoji = content_disposition("🎵🎶.zip", "id.zip")
     assert only_emoji.startswith('attachment; filename="id.zip"')
+    trailing_emoji = content_disposition("The Shortest CELTIC Songs 🎻.zip", "id.zip")
+    assert trailing_emoji.startswith('attachment; filename="The Shortest CELTIC Songs.zip"')
 
 
 def test_title_survives_in_the_zip_comment(tmp_path):
