@@ -314,6 +314,8 @@
         "requestLog": "Anfrage-Protokoll",
         "requestLogSummary": "Letzte {{count}} Anfragen seit dem Neustart (202 = angenommen)",
         "noRequests": "Seit dem letzten Neustart keine Anfragen.",
-        "tookDuration": "Dauer {{duration}}"
+        "tookDuration": "Dauer {{duration}}",
+        "unnamed": "Ohne Namen (ältere Datei)",
+        "fileId": "Datei {{id}}.zip"
     }
 }

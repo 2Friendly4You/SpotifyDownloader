@@ -314,6 +314,8 @@
         "requestLog": "Request log",
         "requestLogSummary": "Last {{count}} requests since the restart (202 = accepted)",
         "noRequests": "No requests since the last restart.",
-        "tookDuration": "took {{duration}}"
+        "tookDuration": "took {{duration}}",
+        "unnamed": "Unnamed (older file)",
+        "fileId": "File {{id}}.zip"
     }
 }
