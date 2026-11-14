@@ -254,8 +254,27 @@ export function DownloadsProvider({ children }: { children: ReactNode }) {
       );
     });
 
-    socket.on("download_cancelled", (data: { unique_id: string }) => {
-      updateRequests((current) => current.filter((item) => item.unique_id !== data.unique_id));
+    socket.on("download_cancelled", (data: { unique_id: string; by_admin?: boolean }) => {
+      if (!data.by_admin) {
+        updateRequests((current) => current.filter((item) => item.unique_id !== data.unique_id));
+        return;
+      }
+      // Cancelled by the operator: keep the card with a reason, so it does
+      // not just vanish, and the user can start it again.
+      updateRequests((current) =>
+        current.map((item) =>
+          item.unique_id === data.unique_id
+            ? {
+                ...item,
+                status: "failed",
+                message: i18n.t("RequestComponent.cancelledByAdmin"),
+                progress: undefined,
+                progressMessage: undefined,
+                etaSeconds: undefined,
+              }
+            : item
+        )
+      );
     });
 
     socket.on(

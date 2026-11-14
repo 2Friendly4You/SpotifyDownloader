@@ -12,6 +12,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 from app import history
 from app.config import ADMIN_PASSWORD, MUSIC_DIR, retention_seconds
 from app.downloads import cancel_running_job, emit_queue_update, expire_download_state, start_promoted_jobs
+from app.extensions import socketio
 from app.routes.search import search_request_log
 from app.searches import get_download_total, persist_concurrent_limit
 from app.state import download_state
@@ -206,7 +207,8 @@ def stats_payload(entries):
             if entry['status'] == 'completed':
                 counts['songs'] += entry.get('songs_saved') or 0
                 counts['bytes'] += entry.get('size_bytes') or 0
-                durations.append(finished - (entry.get('started_at') or entry['created_at']))
+                if entry.get('started_at'):
+                    durations.append(finished - entry['started_at'])
             counts['failed_songs'] += len(entry.get('failed_tracks') or [])
         counts['avg_duration_seconds'] = sum(durations) / len(durations) if durations else None
         return counts
@@ -280,9 +282,10 @@ def admin_cancel_job(unique_id):
     outcome = download_state.request_cancel(unique_id)
     if outcome == 'queued':
         history.finished(unique_id, 'cancelled')
+        socketio.emit('download_cancelled', {'unique_id': unique_id, 'by_admin': True}, namespace='/')
         emit_queue_update()
     elif outcome == 'running':
-        cancel_running_job(unique_id)
+        cancel_running_job(unique_id, by_admin=True)
     else:
         return jsonify({'status': 'error', 'message': 'The job is not running or queued.'}), 409
     current_app.logger.info("Admin cancelled job %s", unique_id)

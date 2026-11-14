@@ -157,7 +157,7 @@ function RecentJob({ job, onDelete }: { job: AdminJob; onDelete: (job: AdminJob)
         <span title={formatDateTime(job.finished_at ?? job.created_at, locale)}>
           {formatRelative(job.finished_at ?? job.created_at, locale)}
         </span>
-        <span>{t("Admin.tookDuration", { duration })}</span>
+        {duration !== "–" && <span>{t("Admin.tookDuration", { duration })}</span>}
         {job.status === "completed" && job.size_bytes != null && <span>{formatBytes(job.size_bytes, locale)}</span>}
         {songs && <span>{songs}</span>}
         {job.format && <span>{job.format.toUpperCase()}</span>}

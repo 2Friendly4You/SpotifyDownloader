@@ -270,8 +270,15 @@ def check_cancelled(unique_id):
         raise JobCancelled(unique_id)
 
 
-def cancel_running_job(unique_id):
+# Jobs an admin cancelled. Their users get a message instead of a card
+# that silently disappears.
+_admin_cancelled = set()
+
+
+def cancel_running_job(unique_id, by_admin=False):
     """Interrupt a running job after DownloadState flagged it as cancelled."""
+    if by_admin:
+        _admin_cancelled.add(unique_id)
     killed = cancellation.stop(unique_id)
     _logger().info("Cancelling download %s (killed processes: %s)", unique_id, killed or 'none')
 
@@ -283,7 +290,11 @@ def finish_cancelled(unique_id):
         os.remove(zip_path)
     download_state.forget(unique_id)
     history.finished(unique_id, 'cancelled')
-    socketio.emit('download_cancelled', {'unique_id': unique_id}, namespace='/')
+    payload = {'unique_id': unique_id}
+    if unique_id in _admin_cancelled:
+        _admin_cancelled.discard(unique_id)
+        payload['by_admin'] = True
+    socketio.emit('download_cancelled', payload, namespace='/')
     _logger().info("Download %s was cancelled and cleaned up", unique_id)
 
 

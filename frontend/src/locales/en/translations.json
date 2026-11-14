@@ -66,7 +66,8 @@
             "Error": "Error",
             "Retrying": "Retrying"
         },
-        "resolvingName": "Looking up the name…"
+        "resolvingName": "Looking up the name…",
+        "cancelledByAdmin": "Cancelled by the operator. You can start the download again."
     },
     "Alert": {
         "ok": "OK",
@@ -209,7 +210,7 @@
         "waitingSince": "Waiting since {{when}}",
         "cancelJob": "Cancel",
         "cancelTitle": "Cancel this download?",
-        "cancelMessage": "\"{{name}}\" will be cancelled and the songs downloaded so far are deleted. Whoever started it will see it as cancelled.",
+        "cancelMessage": "\"{{name}}\" will be cancelled and the songs downloaded so far are deleted. Whoever started it sees \"Cancelled by the operator\" and can start it again.",
         "cancelDone": "\"{{name}}\" was cancelled.",
         "recent": "Recent downloads",
         "recentCount": "{{count}} stored",
