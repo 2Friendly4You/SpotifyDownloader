@@ -350,4 +350,15 @@ def test_songs_with_the_same_title_get_their_own_files(monkeypatch, client, _qui
         assert archive.read("Same (2).mp3").decode().endswith("/two")
         assert archive.read("Same (3).mp3").decode().endswith("/three")
     assert not os.path.exists(folder)
+
+
+def test_copy_folders_survive_spotdl_cleaning_the_output_path():
+    # spotDL strips a leading dot from path parts, so the copy folder must not use one.
+    from spotdl.types.song import Song
+    from spotdl.utils.formatter import create_file_name
+
+    song = Song.from_missing_data(name="Disturbia", artists=["Yoshiko"], artist="Yoshiko")
+    template = os.path.join("/music/job", f"{downloads.COPY_FOLDER_PREFIX}2", "{artists} - {title}.{output-ext}")
+    path = create_file_name(song=song, template=template, file_extension="mp3")
+    assert os.path.basename(os.path.dirname(str(path))) == f"{downloads.COPY_FOLDER_PREFIX}2"
     os.remove(os.path.join(MUSIC_DIR, "retry-job.zip"))

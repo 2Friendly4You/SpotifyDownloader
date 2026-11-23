@@ -361,7 +361,8 @@ def search_songs(downloader, search_query, on_resolved, is_cancelled=None, on_ti
     return songs, failed
 
 
-COPY_FOLDER_PREFIX = '.copy-'
+# spotDL cleans the output path, so no leading dot here.
+COPY_FOLDER_PREFIX = 'copy-'
 
 
 def file_key(downloader, song):
@@ -398,8 +399,11 @@ def copy_slots(downloader, songs):
     return slots
 
 
-def download_batch(downloader, songs, slots):
-    """download_multiple_songs, with each later copy of a file name in its own folder."""
+def download_batch(downloader, songs, slots, copies=None):
+    """download_multiple_songs, with each later copy of a file name in its own folder.
+
+    The files saved for later copies are added to ``copies`` as (path, number).
+    """
     if not slots:
         return downloader.download_multiple_songs(songs)
     template = downloader.settings['output']
@@ -414,28 +418,30 @@ def download_batch(downloader, songs, slots):
             else:
                 folder, name = os.path.split(template)
                 downloader.settings['output'] = os.path.join(folder, f"{COPY_FOLDER_PREFIX}{slot}", name)
-            results.extend(downloader.download_multiple_songs(groups[slot]))
+            batch = downloader.download_multiple_songs(groups[slot])
+            if slot > 1 and copies is not None:
+                copies.extend((str(path), slot) for _, path in batch if path)
+            results.extend(batch)
     finally:
         downloader.settings['output'] = template
     return results
 
 
-def collect_copies(download_folder):
+def collect_copies(copies, download_folder):
     """Move the files of later copies next to the others as "Name (2).mp3"."""
-    for entry in sorted(os.listdir(download_folder)):
-        folder = os.path.join(download_folder, entry)
-        if not (entry.startswith(COPY_FOLDER_PREFIX) and os.path.isdir(folder)):
+    for path, number in copies:
+        if not os.path.isfile(path):
             continue
-        number = entry[len(COPY_FOLDER_PREFIX):]
-        for name in sorted(os.listdir(folder)):
-            base, ext = os.path.splitext(name)
-            suffix = int(number) if number.isdigit() else 2
+        base, ext = os.path.splitext(os.path.basename(path))
+        suffix = number
+        target = os.path.join(download_folder, f"{base} ({suffix}){ext}")
+        while os.path.exists(target):
+            suffix += 1
             target = os.path.join(download_folder, f"{base} ({suffix}){ext}")
-            while os.path.exists(target):
-                suffix += 1
-                target = os.path.join(download_folder, f"{base} ({suffix}){ext}")
-            os.replace(os.path.join(folder, name), target)
-        shutil.rmtree(folder, ignore_errors=True)
+        os.replace(path, target)
+        folder = os.path.dirname(path)
+        if os.path.abspath(folder) != os.path.abspath(download_folder) and not os.listdir(folder):
+            os.rmdir(folder)
 
 
 def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep):
@@ -453,7 +459,8 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
     attach_spotdl_progress(downloader, progress, causes)
     progress.downloading(len(songs))
     errors_before = len(downloader.errors)
-    results = download_batch(downloader, songs, slots)
+    copies = []
+    results = download_batch(downloader, songs, slots, copies)
     check_cancelled(progress.unique_id)
 
     succeeded = [(song, path) for song, path in results if path]
@@ -477,7 +484,7 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
         attach_spotdl_progress(downloader, progress, causes)
         progress.retrying(len(batch))
         errors_before = len(downloader.errors)
-        results = download_batch(downloader, batch, slots)
+        results = download_batch(downloader, batch, slots, copies)
         check_cancelled(progress.unique_id)
         failed = [song for song, path in results if not path] + skipped
         succeeded.extend((song, path) for song, path in results if path)
@@ -490,6 +497,9 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
         failure_entry(song, reasons.get(song.url, 'download_failed'), details.get(song.url))
         for song in failed
     ]
+    folder = os.path.dirname(downloader.settings.get('output') or '')
+    if copies and folder:
+        collect_copies(copies, folder)
     return succeeded, failures
 
 
@@ -640,7 +650,6 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             return
 
         succeeded, download_failures = download_with_retries(downloader, songs, audio_format, progress)
-        collect_copies(download_folder)
         failed_tracks += download_failures
         if not succeeded:
             # The card lists each failed song with its reason, so the job
