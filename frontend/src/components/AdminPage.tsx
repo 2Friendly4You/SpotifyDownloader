@@ -8,6 +8,7 @@ import { serverMessage } from "../serverMessages";
 import { useNotification } from "./Notification";
 import Alert from "./Alert";
 import ThemeSwitcher from "./ThemeSwitcher";
+import FailedTrackList from "./FailedTrackList";
 import LanguageSwitcher from "./LanguageSwitcher";
 import type { AdminJob, AdminOverview } from "./Types";
 import styles from "./AdminPage.module.css";
@@ -55,36 +56,6 @@ function Kpi({ label, value, hint, tone }: { label: string; value: string; hint?
 function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
   return <span className={`${styles.badge} ${styles[`badge_${status}`] ?? ""}`}>{t(`Admin.status.${status}`)}</span>;
-}
-
-function FailedSongs({ job }: { job: AdminJob }) {
-  const { t } = useTranslation();
-  if (!job.failed_tracks.length) {
-    return null;
-  }
-  return (
-    <details className={cardStyles.failedTracks}>
-      <summary>{t("RequestComponent.failedTracks.summary", { count: job.failed_tracks.length })}</summary>
-      <ul>
-        {job.failed_tracks.map((track, index) => (
-          <li key={`${track.url ?? track.title}-${index}`}>
-            {track.url ? (
-              <a href={track.url} target="_blank" rel="noopener noreferrer" className={cardStyles.failedTitle}>
-                {track.title}
-              </a>
-            ) : (
-              <span className={cardStyles.failedTitle}>{track.title}</span>
-            )}
-            <span className={cardStyles.failedReason}>
-              {t(`RequestComponent.failedTracks.reasons.${track.reason}`, {
-                defaultValue: t("RequestComponent.failedTracks.reasons.download_failed"),
-              })}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </details>
-  );
 }
 
 function ActiveJob({ job, onCancel }: { job: AdminJob; onCancel: (job: AdminJob) => void }) {
@@ -168,7 +139,7 @@ function RecentJob({ job, onDelete }: { job: AdminJob; onDelete: (job: AdminJob)
         {job.format && <span>{job.format.toUpperCase()}</span>}
       </p>
       {job.status === "failed" && job.message && <p className={styles.errorText}>{serverMessage(job.message, i18n.language)}</p>}
-      <FailedSongs job={job} />
+      <FailedTrackList tracks={job.failed_tracks} />
       {job.status === "completed" && (
         <div className={styles.actions}>
           {job.file_available ? (

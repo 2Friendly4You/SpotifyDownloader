@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import styles from "./RequestComponent.module.css";
 import type { DownloadRequest } from "./Types";
+import FailedTrackList from "./FailedTrackList";
 import { useDownloads } from "../DownloadsContext";
 import { etaLabel as pickEtaLabel } from "../eta";
 import { requestName } from "../requestName";
@@ -143,29 +144,7 @@ function RequestComponent({
         </div>
       )}
       {request.message && <p className={styles.message}>{serverMessage(request.message, i18n.language)}</p>}
-      {failedTracks.length > 0 && (
-        <details className={styles.failedTracks}>
-          <summary>{t("RequestComponent.failedTracks.summary", { count: failedTracks.length })}</summary>
-          <ul>
-            {failedTracks.map((track, index) => (
-              <li key={`${track.url ?? track.title}-${index}`}>
-                {track.url ? (
-                  <a href={track.url} target="_blank" rel="noopener noreferrer" className={styles.failedTitle}>
-                    {track.title}
-                  </a>
-                ) : (
-                  <span className={styles.failedTitle}>{track.title}</span>
-                )}
-                <span className={styles.failedReason}>
-                  {t(`RequestComponent.failedTracks.reasons.${track.reason}`, {
-                    defaultValue: t("RequestComponent.failedTracks.reasons.download_failed"),
-                  })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <FailedTrackList tracks={failedTracks} />
       <p className={styles.timestamp}>{new Date(request.timestamp).toLocaleString()}</p>
       {showActions && (
         <div className={styles.buttonContainer}>

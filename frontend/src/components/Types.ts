@@ -13,6 +13,8 @@ export type FailedTrack = {
   title: string;
   reason: FailedTrackReason | string;
   url?: string | null;
+  // Short technical cause from the server, e.g. yt-dlp's message.
+  error?: string | null;
 };
 
 export type DownloadRequest = {

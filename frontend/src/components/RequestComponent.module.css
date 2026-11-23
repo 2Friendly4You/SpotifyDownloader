@@ -228,9 +228,21 @@
 
 .failedTracks li {
   display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.failedRow {
+  display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 0.75rem;
+}
+
+.failedError {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  overflow-wrap: anywhere;
 }
 
 .failedTitle {

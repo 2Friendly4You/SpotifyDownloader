@@ -8,6 +8,7 @@ track gets one more attempt with the same provider and then one attempt
 per fallback provider.
 """
 import os
+import re
 
 from spotdl.download.downloader import AUDIO_PROVIDERS
 
@@ -82,6 +83,59 @@ def classify_error(text):
     return 'download_failed'
 
 
+# Kept short so the card and failed-songs.txt stay readable.
+ERROR_TEXT_LIMIT = 180
+_SECRET_RE = re.compile(
+    r"(?i)(bearer\s+\S+|\b(?:access_?token|client_?secret|client_?token|token|key|sig|signature|auth|password)=[^&\s]+)"
+)
+_URL_QUERY_RE = re.compile(r"(https?://[^\s?#]+)[?#]\S*")
+# yt-dlp appends long advice after the actual error ("Use --cookies ...").
+_ADVICE_RE = re.compile(r"\s+(?:Use --cookies|See https?://|Also see https?://|Please report this issue).*$", re.S)
+
+
+def short_error(text, limit=ERROR_TEXT_LIMIT):
+    """A one-line, size-limited error text without tokens or URL query strings."""
+    if text is None:
+        return None
+    text = ' '.join(str(text).split())
+    text = re.sub(r'^(?:ERROR:\s*)+', '', text)
+    text = _ADVICE_RE.sub('', text)
+    text = _SECRET_RE.sub('[hidden]', text)
+    text = _URL_QUERY_RE.sub(r'\1', text)
+    text = text.strip()
+    if not text:
+        return None
+    if len(text) > limit:
+        text = text[:limit - 1].rstrip() + '…'
+    return text
+
+
+def describe_exception(exc):
+    """The innermost cause of ``exc``, e.g. yt-dlp's message behind spotDL's generic one."""
+    seen = set()
+    while exc.__cause__ is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        exc = exc.__cause__
+    message = str(exc).strip()
+    detail = getattr(exc, 'error', None)
+    if isinstance(detail, str) and detail.strip() and detail.strip() not in message:
+        message = f"{message}: {detail.strip()}" if message else detail.strip()
+    return short_error(message or type(exc).__name__)
+
+
+def errors_by_url(errors, songs):
+    """spotDL's error text per song, without the "<song url> - " prefix."""
+    texts = {}
+    for song in songs:
+        if not song.url:
+            continue
+        prefix = f"{song.url} - "
+        for error in errors:
+            if error.startswith(prefix):
+                texts[song.url] = short_error(error[len(prefix):])
+    return texts
+
+
 def reasons_by_url(errors, songs):
     """Reason codes for the songs that the given spotDL errors belong to.
 
@@ -106,8 +160,12 @@ def track_label(song):
     return getattr(song, 'display_name', None) or name or getattr(song, 'url', None) or 'Unknown song'
 
 
-def failure_entry(song, reason):
-    return {'title': track_label(song), 'reason': reason, 'url': getattr(song, 'url', None)}
+def failure_entry(song, reason, error=None):
+    entry = {'title': track_label(song), 'reason': reason, 'url': getattr(song, 'url', None)}
+    error = short_error(error)
+    if error:
+        entry['error'] = error
+    return entry
 
 
 def use_provider(downloader, name):
@@ -137,4 +195,6 @@ def failed_tracks_text(failed_tracks):
         if track.get('url'):
             line += f" {track['url']}"
         lines.append(line)
+        if track.get('error'):
+            lines.append(f"    Error: {track['error']}")
     return '\n'.join(lines) + '\n'
