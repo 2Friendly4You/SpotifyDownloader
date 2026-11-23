@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import concurrent.futures
 import os
 import shutil
@@ -9,7 +10,9 @@ import zipfile
 import yt_dlp
 from spotdl.download.downloader import Downloader
 from spotdl.download.progress_handler import ProgressHandler
+from spotdl.types.song import Song
 from spotdl.utils.config import SPOTIFY_OPTIONS
+from spotdl.utils.formatter import create_file_name
 from spotdl.utils.search import get_simple_songs, reinit_song
 from spotdl.utils.spotify import SpotifyClient, SpotifyError
 
@@ -21,6 +24,8 @@ from app.progress import EtaEstimator, SongProgress, ThroughputEta, round_eta
 from app.retries import (
     FAILED_TRACKS_FILE,
     MAX_FAILED_TRACKS,
+    describe_exception,
+    errors_by_url,
     failed_tracks_text,
     failure_entry,
     fallback_song_limit,
@@ -40,6 +45,11 @@ _spotify_init_lock = threading.Lock()
 SEARCH_LIST_PERCENT = 1.0
 SEARCH_DONE_PERCENT = 5.0
 SPOTDL_THREADS = 4
+# Song lookups go to Spotify's web player API, which turns away bursts of
+# requests (three per song). Two at a time is gentler than the download threads.
+METADATA_THREADS = 2
+# Lookups that failed are tried again one by one after these pauses (seconds).
+METADATA_RETRY_DELAYS = (2.0, 5.0, 10.0)
 DOWNLOAD_DONE_PERCENT = 95.0
 
 
@@ -102,15 +112,21 @@ class SpotdlProgress:
             'songs_total': total,
         })
 
-    def downloading(self, total):
-        self.total = total
-        self._eta = ThroughputEta(total, workers=self._workers, clock=self._clock)
-        self._songs = SongProgress(total)
+    def downloading(self, count):
+        """``count`` songs start downloading.
+
+        The counter keeps the size of the whole playlist from the search, so
+        a song whose lookup failed still shows up as missing ("106/115").
+        The estimate only covers the songs that are actually downloaded.
+        """
+        self.total = max(self.total, count)
+        self._eta = ThroughputEta(count, workers=self._workers, clock=self._clock)
+        self._songs = SongProgress(count)
         self._saved_before = 0
-        history.set_songs(self.unique_id, total)
+        history.set_songs(self.unique_id, self.total)
         report_progress(self.unique_id, SEARCH_DONE_PERCENT, 'Downloading', force=True, details={
             'songs_done': 0,
-            'songs_total': total,
+            'songs_total': self.total,
         })
 
     def song_update(self, key, percent, message):
@@ -162,18 +178,41 @@ def youtube_download_percent(data):
     return ((index - 1) + fraction) / count * 90
 
 
-def attach_spotdl_progress(downloader, progress):
-    """Give the downloader a fresh progress handler that feeds ``progress``."""
+def attach_spotdl_progress(downloader, progress, error_sink=None):
+    """Give the downloader a fresh progress handler that feeds ``progress``.
+
+    With ``error_sink`` (a dict) the real cause of each failed song is kept
+    there by song URL. spotDL itself only records a generic text such as
+    "YT-DLP download error - <url>".
+    """
     def callback(tracker, message):
         # Raising here aborts the yt-dlp download or spotDL step that reported.
         check_cancelled(progress.unique_id)
         progress.song_update(id(tracker), tracker.progress, message)
 
-    downloader.progress_handler = ProgressHandler(
+    handler = ProgressHandler(
         simple_tui=True,
         update_callback=callback,
         web_ui=True,
     )
+    if error_sink is not None:
+        new_tracker = handler.get_new_tracker
+
+        def get_new_tracker(song):
+            tracker = new_tracker(song)
+            notify_error = tracker.notify_error
+
+            def record_error(message, traceback, finish=False):
+                url = getattr(song, 'url', None)
+                if url and isinstance(traceback, BaseException):
+                    error_sink[url] = describe_exception(traceback)
+                return notify_error(message, traceback, finish)
+
+            tracker.notify_error = record_error
+            return tracker
+
+        handler.get_new_tracker = get_new_tracker
+    downloader.progress_handler = handler
 
 
 def publish_title(unique_id, title):
@@ -191,11 +230,70 @@ def job_download_url(unique_id):
     return f'/api/download/{unique_id}'
 
 
+def playlist_song(song):
+    """A downloadable song from the playlist's own data, or None.
+
+    Used when the full lookup of a song keeps failing. The playlist already
+    has the title, artists and length, which is all the search needs. The
+    album details spotDL would look up are filled with neutral values so it
+    does not try the failing lookup again during the download.
+    """
+    data = getattr(song, 'json', None)
+    if not isinstance(data, dict):
+        return None
+    artists = data.get('artists') or ([data['artist']] if data.get('artist') else [])
+    if not data.get('name') or not artists:
+        return None
+    data = dict(data)
+    data['artists'] = artists
+    data['artist'] = data.get('artist') or artists[0]
+    defaults = {
+        'genres': [],
+        'disc_number': 1,
+        'track_number': 1,
+        'album_name': data['name'],
+        'album_artist': data['artist'],
+        'album_id': '',
+        'publisher': '',
+        'explicit': False,
+        # mutagen refuses None for these tags, so spotDL would fail to tag the file.
+        'date': '',
+        'isrc': '',
+    }
+    for key, value in defaults.items():
+        if data.get(key) is None:
+            data[key] = value
+    if data.get('disc_count') is None:
+        data['disc_count'] = data['disc_number']
+    if data.get('tracks_count') is None:
+        data['tracks_count'] = data['track_number']
+    try:
+        return Song(**{key: data.get(key) for key in Song.__dataclass_fields__})  # pylint: disable=E1101
+    except TypeError:
+        return None
+
+
+def _sleep(seconds, is_cancelled=None):
+    """Sleep, but stop early once the job is cancelled."""
+    deadline = time.monotonic() + seconds
+    while True:
+        if is_cancelled is not None and is_cancelled():
+            raise JobCancelled()
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return
+        time.sleep(min(left, 0.5))
+
+
 def search_songs(downloader, search_query, on_resolved, is_cancelled=None, on_title=None):
     """spotDL's parse_query, reporting each song whose metadata is resolved.
 
     Mirrors spotdl.utils.search.parse_query (spotDL 4.6.0) so the search
-    phase can show "x/y songs" instead of a frozen bar.
+    phase can show "x/y songs" instead of a frozen bar. Lookups that fail
+    are retried one by one after METADATA_RETRY_DELAYS. A song that still
+    fails is downloaded with the playlist's own data; only a song without
+    even a title and artist is reported as failed. Songs keep the playlist
+    order.
     """
     settings = downloader.settings
     simple_songs = get_simple_songs(
@@ -211,24 +309,133 @@ def search_songs(downloader, search_query, on_resolved, is_cancelled=None, on_ti
     if total:
         on_resolved(0, total)
 
-    songs = []
-    failed = []
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=settings["threads"])
+    def check():
+        if is_cancelled is not None and is_cancelled():
+            raise JobCancelled()
+
+    resolved = [None] * total
+    pending = {}
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=METADATA_THREADS)
     try:
-        futures = {executor.submit(reinit_song, song): song for song in simple_songs}
+        futures = {executor.submit(reinit_song, song): index for index, song in enumerate(simple_songs)}
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-            if is_cancelled is not None and is_cancelled():
-                raise JobCancelled()
+            check()
+            index = futures[future]
             try:
-                songs.append(future.result())
+                resolved[index] = future.result()
             except Exception as exc:
-                _logger().error("%s generated an exception: %s", futures[future].display_name, exc)
-                failed.append(failure_entry(futures[future], 'metadata_failed'))
+                pending[index] = exc
             on_resolved(done, total)
     finally:
         # Do not wait for lookups that are no longer needed after a cancel.
         executor.shutdown(wait=False, cancel_futures=True)
+
+    for attempt, delay in enumerate(METADATA_RETRY_DELAYS, start=1):
+        if not pending:
+            break
+        _logger().info(
+            "Retrying the lookup of %d songs (attempt %d) in %.0f s", len(pending), attempt, delay
+        )
+        _sleep(delay, is_cancelled)
+        for index in list(pending):
+            check()
+            try:
+                resolved[index] = reinit_song(simple_songs[index])
+                del pending[index]
+            except Exception as exc:
+                pending[index] = exc
+
+    failed = []
+    for index, exc in sorted(pending.items()):
+        song = simple_songs[index]
+        fallback = playlist_song(song)
+        if fallback is not None:
+            _logger().warning(
+                "Lookup of %s kept failing (%s), using the playlist data", song.display_name, exc
+            )
+            resolved[index] = fallback
+            continue
+        _logger().error("%s generated an exception: %s", song.display_name, exc)
+        failed.append(failure_entry(song, 'metadata_failed', describe_exception(exc)))
+    songs = [song for song in resolved if song is not None]
     return songs, failed
+
+
+COPY_FOLDER_PREFIX = '.copy-'
+
+
+def file_key(downloader, song):
+    """The file name spotDL will give ``song``, case-folded for case-insensitive file systems."""
+    settings = downloader.settings
+    try:
+        path = create_file_name(
+            song=song,
+            template=settings['output'],
+            file_extension=settings['format'],
+            restrict=settings.get('restrict'),
+            file_name_length=settings.get('max_filename_length'),
+        )
+        return str(path).casefold()
+    except Exception:
+        return str(getattr(song, 'display_name', None) or getattr(song, 'url', '')).casefold()
+
+
+def copy_slots(downloader, songs):
+    """Number songs that would share a file name: the second gets 2, the third 3...
+
+    spotDL skips a song when its file already exists, so two different
+    tracks with the same artists and title would end up as one file.
+    """
+    if not downloader.settings.get('output'):
+        return {}
+    seen = collections.Counter()
+    slots = {}
+    for song in songs:
+        key = file_key(downloader, song)
+        seen[key] += 1
+        if seen[key] > 1:
+            slots[id(song)] = seen[key]
+    return slots
+
+
+def download_batch(downloader, songs, slots):
+    """download_multiple_songs, with each later copy of a file name in its own folder."""
+    if not slots:
+        return downloader.download_multiple_songs(songs)
+    template = downloader.settings['output']
+    groups = collections.defaultdict(list)
+    for song in songs:
+        groups[slots.get(id(song), 1)].append(song)
+    results = []
+    try:
+        for slot in sorted(groups):
+            if slot == 1:
+                downloader.settings['output'] = template
+            else:
+                folder, name = os.path.split(template)
+                downloader.settings['output'] = os.path.join(folder, f"{COPY_FOLDER_PREFIX}{slot}", name)
+            results.extend(downloader.download_multiple_songs(groups[slot]))
+    finally:
+        downloader.settings['output'] = template
+    return results
+
+
+def collect_copies(download_folder):
+    """Move the files of later copies next to the others as "Name (2).mp3"."""
+    for entry in sorted(os.listdir(download_folder)):
+        folder = os.path.join(download_folder, entry)
+        if not (entry.startswith(COPY_FOLDER_PREFIX) and os.path.isdir(folder)):
+            continue
+        number = entry[len(COPY_FOLDER_PREFIX):]
+        for name in sorted(os.listdir(folder)):
+            base, ext = os.path.splitext(name)
+            suffix = int(number) if number.isdigit() else 2
+            target = os.path.join(download_folder, f"{base} ({suffix}){ext}")
+            while os.path.exists(target):
+                suffix += 1
+                target = os.path.join(download_folder, f"{base} ({suffix}){ext}")
+            os.replace(os.path.join(folder, name), target)
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep):
@@ -241,15 +448,19 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
     user's own provider, because the fallbacks often just do not have the
     song.
     """
-    attach_spotdl_progress(downloader, progress)
+    slots = copy_slots(downloader, songs)
+    causes = {}
+    attach_spotdl_progress(downloader, progress, causes)
     progress.downloading(len(songs))
     errors_before = len(downloader.errors)
-    results = downloader.download_multiple_songs(songs)
+    results = download_batch(downloader, songs, slots)
     check_cancelled(progress.unique_id)
 
     succeeded = [(song, path) for song, path in results if path]
     failed = [song for song, path in results if not path]
     reasons = reasons_by_url(downloader.errors[errors_before:], failed)
+    details = errors_by_url(downloader.errors[errors_before:], failed)
+    details.update({url: text for url, text in causes.items() if text})
 
     delay = retry_delay()
     limit = fallback_song_limit()
@@ -262,17 +473,23 @@ def download_with_retries(downloader, songs, primary, progress, sleep=time.sleep
         if delay:
             sleep(delay)
         use_provider(downloader, provider)
-        attach_spotdl_progress(downloader, progress)
+        causes = {}
+        attach_spotdl_progress(downloader, progress, causes)
         progress.retrying(len(batch))
         errors_before = len(downloader.errors)
-        results = downloader.download_multiple_songs(batch)
+        results = download_batch(downloader, batch, slots)
         check_cancelled(progress.unique_id)
         failed = [song for song, path in results if not path] + skipped
         succeeded.extend((song, path) for song, path in results if path)
         if provider == primary:
             reasons.update(reasons_by_url(downloader.errors[errors_before:], failed))
+            details.update(errors_by_url(downloader.errors[errors_before:], failed))
+            details.update({url: text for url, text in causes.items() if text})
 
-    failures = [failure_entry(song, reasons.get(song.url, 'download_failed')) for song in failed]
+    failures = [
+        failure_entry(song, reasons.get(song.url, 'download_failed'), details.get(song.url))
+        for song in failed
+    ]
     return succeeded, failures
 
 
@@ -423,6 +640,7 @@ def run_spotdl(unique_id, search_query, audio_format, lyrics_format, output_form
             return
 
         succeeded, download_failures = download_with_retries(downloader, songs, audio_format, progress)
+        collect_copies(download_folder)
         failed_tracks += download_failures
         if not succeeded:
             # The card lists each failed song with its reason, so the job

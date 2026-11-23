@@ -205,7 +205,11 @@ spotDL alone gives up quickly on a song. yt-dlp retries a broken HTTP transfer, 
 
 1. It waits `RETRY_DELAY_SECONDS` (default 3) and tries again with the same provider.
 2. It tries each provider in `AUDIO_PROVIDER_FALLBACKS` (default `youtube-music,soundcloud,youtube`, skipping the selected one). An empty value turns the fallbacks off. Only the first `FALLBACK_SONG_LIMIT` (default 30) failed songs get these attempts, so a mostly broken playlist does not hit the one-hour job timeout.
-3. Songs that still fail are listed on the download card under "N songs failed" with a short reason, and in `failed-songs.txt` inside the zip.
+3. Songs that still fail are listed on the download card under "N songs failed" with a short reason and the actual error (for example yt-dlp's "Sign in to confirm your age"), and in `failed-songs.txt` inside the zip. The error is also kept in the job history.
+
+Before any download, spotDL looks up each song's full metadata on Spotify (three requests per song). The app runs two lookups at a time. A lookup that fails is tried again one by one after 2, 5 and 10 seconds. If it still fails, the song is downloaded with the data the playlist already has (title, artists, length); only album details such as genre are missing then.
+
+The song counter always counts the whole playlist. Two different tracks with the same artists and title are saved as `Name.mp3` and `Name (2).mp3` instead of one replacing the other, so the number of saved songs matches the files in the zip.
 
 Bandcamp is not a default fallback because its search fails in spotDL 4.6.0. SoundCloud cannot download DRM-protected tracks, which covers many major-label songs.
 

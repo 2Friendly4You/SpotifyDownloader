@@ -194,7 +194,7 @@ def test_search_reports_each_resolved_song(monkeypatch):
         return song.display_name.upper()
 
     monkeypatch.setattr(downloads, "reinit_song", reinit)
-    monkeypatch.setattr(downloads, "_logger", lambda: type("L", (), {"error": staticmethod(lambda *a: None)}))
+    monkeypatch.setattr(downloads, "_sleep", lambda seconds, is_cancelled=None: None)
 
     class FakeDownloader:
         settings = {
@@ -209,9 +209,116 @@ def test_search_reports_each_resolved_song(monkeypatch):
     songs, failed = downloads.search_songs(
         FakeDownloader(), "query", lambda done, total: calls.append((done, total))
     )
-    assert sorted(songs) == ["A", "B"]
-    assert failed == [{"title": "broken", "reason": "metadata_failed", "url": None}]
+    # Playlist order, and the song without any data is reported with its error.
+    assert songs == ["A", "B"]
+    assert failed == [{"title": "broken", "reason": "metadata_failed", "url": None, "error": "no metadata"}]
     assert calls == [(0, 3), (1, 3), (2, 3), (3, 3)]
+
+
+class _SearchDownloader:
+    settings = {
+        "threads": 4,
+        "ytm_data": False,
+        "playlist_numbering": False,
+        "album_type": None,
+        "playlist_retain_track_cover": False,
+    }
+
+
+def _playlist_song(key, name):
+    from spotdl.types.song import Song
+
+    return Song.from_missing_data(
+        name=name,
+        artists=["Mr. Polska", "Ski Aggu"],
+        artist="Mr. Polska",
+        duration=155,
+        url=f"https://open.spotify.com/track/{key}",
+        song_id=key,
+        album_name="Spring",
+    )
+
+
+def test_a_failed_lookup_is_tried_again_after_a_pause(monkeypatch):
+    playlist = [_playlist_song("a", "One"), _playlist_song("b", "Two")]
+    monkeypatch.setattr(downloads, "get_simple_songs", lambda query, **kwargs: playlist)
+    attempts = {}
+
+    def reinit(song):
+        attempts[song.name] = attempts.get(song.name, 0) + 1
+        if song.name == "Two" and attempts["Two"] < 3:
+            raise RuntimeError("Could not get song info")
+        return f"full {song.name}"
+
+    pauses = []
+    monkeypatch.setattr(downloads, "reinit_song", reinit)
+    monkeypatch.setattr(downloads, "_sleep", lambda seconds, is_cancelled=None: pauses.append(seconds))
+
+    songs, failed = downloads.search_songs(_SearchDownloader(), "query", lambda done, total: None)
+    assert songs == ["full One", "full Two"]
+    assert failed == []
+    assert attempts == {"One": 1, "Two": 3}
+    assert pauses == [2.0, 5.0]
+
+
+def test_a_lookup_that_keeps_failing_uses_the_playlist_data(monkeypatch):
+    playlist = [_playlist_song("a", "Spring")]
+    monkeypatch.setattr(downloads, "get_simple_songs", lambda query, **kwargs: playlist)
+    pauses = []
+
+    def reinit(song):
+        raise RuntimeError("Could not get song info")
+
+    monkeypatch.setattr(downloads, "reinit_song", reinit)
+    monkeypatch.setattr(downloads, "_sleep", lambda seconds, is_cancelled=None: pauses.append(seconds))
+
+    songs, failed = downloads.search_songs(_SearchDownloader(), "query", lambda done, total: None)
+    assert failed == []
+    assert pauses == [2.0, 5.0, 10.0]
+    [song] = songs
+    assert (song.name, song.artists, song.duration, song.url) == (
+        "Spring", ["Mr. Polska", "Ski Aggu"], 155, "https://open.spotify.com/track/a",
+    )
+    # Filled in so spotDL does not try the failing lookup again while downloading.
+    assert song.genres == [] and song.disc_count == 1 and song.tracks_count == 1
+    assert song.album_artist == "Mr. Polska" and song.album_id == ""
+    assert song.date == "" and song.isrc == ""
+
+
+def test_metadata_lookups_run_two_at_a_time(monkeypatch):
+    import threading
+    import time as real_time
+
+    playlist = [_playlist_song(str(i), f"Song {i}") for i in range(6)]
+    monkeypatch.setattr(downloads, "get_simple_songs", lambda query, **kwargs: playlist)
+    lock = threading.Lock()
+    state = {"now": 0, "max": 0}
+
+    def reinit(song):
+        with lock:
+            state["now"] += 1
+            state["max"] = max(state["max"], state["now"])
+        real_time.sleep(0.05)
+        with lock:
+            state["now"] -= 1
+        return song
+
+    monkeypatch.setattr(downloads, "reinit_song", reinit)
+    songs, _ = downloads.search_songs(_SearchDownloader(), "query", lambda done, total: None)
+    assert len(songs) == 6
+    assert state["max"] == 2
+
+
+def test_the_counter_keeps_the_whole_playlist_size(emitted, monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr("app.state.time.monotonic", clock)
+    progress = downloads.SpotdlProgress("job", clock=clock, workers=4)
+    progress.searching()
+    progress.resolved(5, 5)
+    # Two songs had no data at all, three are downloaded.
+    progress.downloading(3)
+    assert emitted[-1][1]["songs_total"] == 5
+    assert emitted[-1][1]["songs_done"] == 0
 
 
 def test_spotdl_progress_moves_through_the_phases(emitted, monkeypatch):

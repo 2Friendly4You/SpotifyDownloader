@@ -5,7 +5,14 @@ import pytest
 
 from app import downloads
 from app.config import MUSIC_DIR
-from app.retries import classify_error, failed_tracks_text, fallback_providers, retry_plan
+from app.retries import (
+    classify_error,
+    describe_exception,
+    failed_tracks_text,
+    fallback_providers,
+    retry_plan,
+    short_error,
+)
 from app.state import DownloadState, download_state
 
 
@@ -29,7 +36,8 @@ class FakeLoop:
 class FakeDownloader:
     """Succeeds for a song once its provider/attempt is listed in ``succeed_on``."""
 
-    def __init__(self, primary, succeed_on, folder=None, error="AudioProviderError: YT-DLP download error - x"):
+    def __init__(self, primary, succeed_on, folder=None, error="AudioProviderError: YT-DLP download error - x",
+                 output=None):
         self.settings = {
             "audio_providers": [primary],
             "threads": 4,
@@ -38,6 +46,9 @@ class FakeDownloader:
             "album_type": None,
             "playlist_retain_track_cover": False,
         }
+        if output:
+            self.settings["output"] = output
+            self.settings["format"] = "mp3"
         self.succeed_on = succeed_on
         self.folder = folder
         self.error = error
@@ -55,10 +66,14 @@ class FakeDownloader:
             wanted = self.succeed_on.get(song.name.lower())
             if wanted is not None and (wanted == provider or wanted == attempt):
                 path = None
-                if self.folder:
-                    path = os.path.join(self.folder, f"{song.name}.mp3")
-                    with open(path, "w") as handle:
-                        handle.write("audio")
+                folder = os.path.dirname(self.settings["output"]) if "output" in self.settings else self.folder
+                if folder:
+                    os.makedirs(folder, exist_ok=True)
+                    path = os.path.join(folder, f"{song.name}.mp3")
+                    # Like spotDL: an existing file counts as saved and is not written again.
+                    if not os.path.exists(path):
+                        with open(path, "w") as handle:
+                            handle.write(f"audio {song.url}")
                 results.append((song, path or f"/tmp/{song.name}.mp3"))
             else:
                 self.errors.append(f"{song.url} - {self.error}")
@@ -126,6 +141,7 @@ def test_a_song_that_fails_everywhere_keeps_the_reason_from_the_users_provider()
         "title": "Artist, Guest - Lost",
         "reason": "not_found",
         "url": "https://open.spotify.com/track/lost",
+        "error": "LookupError: No results found for song: Artist - Lost",
     }]
     assert [provider for provider, _ in downloader.calls] == [
         "youtube-music", "youtube-music", "soundcloud", "youtube",
@@ -178,6 +194,7 @@ def test_partly_failed_playlist_lists_the_failures(monkeypatch, client, _quiet):
         "title": "Artist - Bad",
         "reason": "download_failed",
         "url": "https://open.spotify.com/track/bad",
+        "error": "AudioProviderError: YT-DLP download error - x",
     }]
     body = client.get("/api/status/retry-job").get_json()
     assert body["status"] == "completed"
@@ -186,7 +203,9 @@ def test_partly_failed_playlist_lists_the_failures(monkeypatch, client, _quiet):
     with zipfile.ZipFile(os.path.join(MUSIC_DIR, "retry-job.zip")) as archive:
         names = sorted(archive.namelist())
         assert names == ["Ok.mp3", "failed-songs.txt"]
-        assert "Artist - Bad (Download failed)" in archive.read("failed-songs.txt").decode()
+        text = archive.read("failed-songs.txt").decode()
+        assert "Artist - Bad (Download failed)" in text
+        assert "    Error: AudioProviderError: YT-DLP download error - x" in text
     os.remove(os.path.join(MUSIC_DIR, "retry-job.zip"))
 
 
@@ -238,3 +257,97 @@ def test_only_a_limited_number_of_songs_get_fallback_attempts(monkeypatch):
     ]
     assert sorted(track["title"] for track in failures) == ["Artist - A", "Artist - B"]
     download_state.release("job")
+
+
+def test_failed_tracks_text_adds_the_error_below_the_song():
+    text = failed_tracks_text([
+        {"title": "A - One", "reason": "download_failed", "url": "u1", "error": "Sign in to confirm your age."},
+    ])
+    assert text.splitlines()[2:] == [
+        "A - One (Download failed) u1",
+        "    Error: Sign in to confirm your age.",
+    ]
+
+
+def test_error_texts_are_short_and_without_secrets():
+    age = (
+        "ERROR: [youtube] r2Fu8RHv_mI: Sign in to confirm your age. This video may be inappropriate "
+        "for some users. Use --cookies-from-browser or --cookies for the authentication. See "
+        "https://github.com/yt-dlp/yt-dlp/wiki/FAQ for how to manually pass cookies."
+    )
+    assert short_error(age) == (
+        "[youtube] r2Fu8RHv_mI: Sign in to confirm your age. This video may be inappropriate for some users."
+    )
+    masked = short_error("GET https://api.example.com/x?access_token=abc123&q=1 failed: Bearer eyJhbGci token=zzz")
+    assert "abc123" not in masked and "eyJhbGci" not in masked and "zzz" not in masked
+    assert masked.startswith("GET https://api.example.com/x failed")
+    assert len(short_error("x" * 1000)) == 180
+    assert short_error("   ") is None
+    assert short_error(None) is None
+
+
+def test_the_innermost_cause_is_reported():
+    try:
+        try:
+            raise RuntimeError("ERROR: [youtube] abc: Sign in to confirm your age.")
+        except RuntimeError as inner:
+            raise ValueError("YT-DLP download error - https://music.youtube.com/watch?v=abc") from inner
+    except ValueError as outer:
+        assert describe_exception(outer) == "[youtube] abc: Sign in to confirm your age."
+
+    class ApiError(Exception):
+        def __init__(self, message, error=None):
+            super().__init__(message)
+            self.error = error
+
+    assert describe_exception(ApiError("Could not get song info", error="429 Too Many Requests")) == (
+        "Could not get song info: 429 Too Many Requests"
+    )
+
+
+def test_the_real_cause_of_a_failed_download_is_kept(monkeypatch):
+    from spotdl.download.progress_handler import ProgressHandler
+    from spotdl.types.song import Song
+
+    song = Song.from_missing_data(
+        name="SMD", artists=["RomancePlanet"], artist="RomancePlanet", url="https://open.spotify.com/track/smd"
+    )
+    downloader = FakeDownloader("youtube-music", {})
+    sink = {}
+    progress = downloads.SpotdlProgress("job")
+    downloads.attach_spotdl_progress(downloader, progress, sink)
+    progress.downloading(1)
+    assert isinstance(downloader.progress_handler, ProgressHandler)
+    tracker = downloader.progress_handler.get_new_tracker(song)
+    try:
+        try:
+            raise RuntimeError("ERROR: [youtube] r2Fu8RHv_mI: Sign in to confirm your age.")
+        except RuntimeError as inner:
+            raise ValueError("YT-DLP download error - url") from inner
+    except ValueError as outer:
+        tracker.notify_error("traceback", outer, True)
+    assert sink == {"https://open.spotify.com/track/smd": "[youtube] r2Fu8RHv_mI: Sign in to confirm your age."}
+    download_state.release("job")
+
+
+def test_songs_with_the_same_title_get_their_own_files(monkeypatch, client, _quiet):
+    folder = os.path.join(MUSIC_DIR, "retry-job")
+
+    def factory(settings):
+        return FakeDownloader(
+            "youtube-music", {"same": "youtube-music"}, output=settings["output"]
+        )
+
+    _run(monkeypatch, [FakeSong("one", name="Same"), FakeSong("two", name="Same"), FakeSong("three", name="Same")], factory)
+
+    complete = [data for name, data in _quiet if name == "download_complete"]
+    assert "failed_tracks" not in complete[-1]
+    with zipfile.ZipFile(os.path.join(MUSIC_DIR, "retry-job.zip")) as archive:
+        names = sorted(archive.namelist())
+        assert names == ["Same (2).mp3", "Same (3).mp3", "Same.mp3"]
+        # Each file is a different track, nothing was overwritten.
+        assert archive.read("Same.mp3").decode().endswith("/one")
+        assert archive.read("Same (2).mp3").decode().endswith("/two")
+        assert archive.read("Same (3).mp3").decode().endswith("/three")
+    assert not os.path.exists(folder)
+    os.remove(os.path.join(MUSIC_DIR, "retry-job.zip"))
