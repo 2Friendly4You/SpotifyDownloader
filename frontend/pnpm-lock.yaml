@@ -22,7 +22,7 @@ importers:
         version: 19.3.1(react@19.3.1)
       react-i18next:
         specifier: ^18.0.0
-        version: 18.0.3(@types/react@19.3.0)(i18next@27.1.1(typescript@7.0.2))(react@19.3.1)(typescript@7.0.2)
+        version: 18.0.3(@types/react@19.3.3)(i18next@27.1.1(typescript@7.0.2))(react@19.3.1)(typescript@7.0.2)
       react-router-dom:
         specifier: ^7.18.4
         version: 7.18.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -35,10 +35,10 @@ importers:
         version: 10.0.1(eslint@10.15.0)
       '@types/react':
         specifier: ^19.3.0
-        version: 19.3.0
+        version: 19.3.3
       '@types/react-dom':
         specifier: ^19.3.0
-        version: 19.3.0(@types/react@19.3.0)
+        version: 19.3.0(@types/react@19.3.3)
       '@vitejs/plugin-react':
         specifier: ^6.1.2
         version: 6.3.0(vite@8.3.8)
@@ -349,8 +349,8 @@ packages:
     peerDependencies:
       '@types/react': ^19.3.0
 
-  '@types/react@19.3.0':
-    resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
+  '@types/react@19.3.3':
+    resolution: {integrity: sha512-K8uWpJc4teiuOPdiP1umjeA9rGMgVPiXuoL66fcS1QlwBT1WMqY8PORmub9FadopIs+RCW6siYEs7Lpq+vDlog==}
 
   '@typescript-eslint/eslint-plugin@8.72.2':
     resolution: {integrity: sha512-222PKFXKihmFpi/pS5njoBgdAqsPhj2/GBmFbrNw8Tq8gEG9Sv+kSlKFy4u2q+mJv9ZzJgM2Gkv/bUzRZwZw5g==}
@@ -1411,11 +1411,11 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
-  '@types/react-dom@19.3.0(@types/react@19.3.0)':
+  '@types/react-dom@19.3.0(@types/react@19.3.3)':
     dependencies:
-      '@types/react': 19.3.0
+      '@types/react': 19.3.3
 
-  '@types/react@19.3.0':
+  '@types/react@19.3.3':
     dependencies:
       csstype: 3.2.3
 
@@ -1946,13 +1946,13 @@ snapshots:
       react: 19.3.1
       scheduler: 0.28.0
 
-  react-i18next@18.0.3(@types/react@19.3.0)(i18next@27.1.1(typescript@7.0.2))(react@19.3.1)(typescript@7.0.2):
+  react-i18next@18.0.3(@types/react@19.3.3)(i18next@27.1.1(typescript@7.0.2))(react@19.3.1)(typescript@7.0.2):
     dependencies:
       html-parse-stringify: 4.0.1
       i18next: 27.1.1(typescript@7.0.2)
       react: 19.3.1
     optionalDependencies:
-      '@types/react': 19.3.0
+      '@types/react': 19.3.3
       typescript: 7.0.2
 
   react-router-dom@7.18.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
